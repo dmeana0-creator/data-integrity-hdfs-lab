@@ -1,59 +1,87 @@
-# 1. Importamos las librerías necesarias
 from datetime import datetime
-from hdfs import InsecureClient
+from hdfs import InsecureClient  # Librería específica para conectar Python con Hadoop (HDFS)
 
-# 2. Definimos la función principal a través de la cual vamos a crear los directorios
+# ---------------------------------------------------------
+# FUNCIÓN PRINCIPAL DE CREACIÓN DE DIRECTORIOS
+# ---------------------------------------------------------
 def crear_directorios_hdfs():
-    # 3. Configuramos las variables de conexión con nuestro sistema de archivos HDFS
+    
+    # ---------------------------------------------------------
+    # 1. CONFIGURACIÓN DE LA CONEXIÓN
+    # ---------------------------------------------------------
+    # Definimos dónde está "escuchando" nuestro sistema Hadoop.
+    # host: La dirección del servidor (localhost porque estamos en la misma máquina).
+    # port: 9870 es el puerto web estándar para Hadoop 3.
+    # user: El usuario con permisos para crear carpetas.
     host = "localhost"
     port = 9870
     user = "hdadmin"
     url = f'http://{host}:{port}'
     
-    # 4. Definimos la partición de fecha dinámica (Formato Hive: dt=YYYY-MM-DD)
+    # ---------------------------------------------------------
+    # 2. CONFIGURACIÓN DE LA FECHA (PARTICIONAMIENTO)
+    # ---------------------------------------------------------
+    # Calculamos la fecha de hoy.
+    # Importante: Usamos el formato 'dt=AAAA-MM-DD'.
+    # Esto es un estándar en Big Data (Hive/Spark) para organizar datos por días.
     dt = datetime.now().strftime('%Y-%m-%d')
     particion = f"dt={dt}"
 
-    # 5. Definimos la lista de rutas base donde queremos crear las particiones
-    # El script iterará sobre esta lista añadiendo la fecha al final de cada una
+    # ---------------------------------------------------------
+    # 3. LISTA DE RUTAS A PROCESAR
+    # ---------------------------------------------------------
+    # Lista maestra con todas las carpetas donde queremos crear el hueco para hoy.
+    # Si quieres añadir un nuevo proceso en el futuro, solo agregas una línea aquí.
     rutas_base = [
-        "/data/logs/raw",          # Datos originales de los Logs
-        "/data/iot/raw",           # Datos originales de los sensores IoT
-        "/audit/fsck",             # Informes de salud del sistema (fsck)
-        "/audit/inventory",        # Listas para comprobar que no faltan archivos
-        "/backup/logs/raw",        # Copias de seguridad de los Logs
-        "/backup/iot/raw"          # Copias de seguridad del IoT
-        
+        "/data/logs/raw",          # Datos crudos de Logs
+        "/data/iot/raw",           # Datos crudos de sensores IoT
+        "/audit/fsck",             # Auditorías de salud del sistema
+        "/audit/inventory",        # Inventarios de archivos
+        "/backup/logs/raw",        # Carpeta de respaldo para Logs
+        "/backup/iot/raw"          # Carpeta de respaldo para IoT
     ]
 
-    # 6. Informamos al usuario por consola que el proceso ha iniciado
-    print(f"--> Iniciando proceso para fecha: {dt}")
+    print(f"--> Iniciando proceso de creación para fecha: {dt}")
 
-    # 7. Iniciamos un bloque de control de errores global (para la conexión)
+    # ---------------------------------------------------------
+    # 4. LÓGICA DE CONEXIÓN Y CREACIÓN
+    # ---------------------------------------------------------
+    
+    # BLOQUE DE SEGURIDAD 1 (GLOBAL): LA CONEXIÓN
+    # Intentamos conectar con el servidor. Si falla aquí, nada funcionará.
     try:
-        # 8. Establecemos la conexión con el cliente HDFS usando las variables definidas
+        # Creamos el cliente (el "mando a distancia" para manejar HDFS).
         client = InsecureClient(url, user=user)
-        print(f"--> Conectado a HDFS en {url}")
+        print(f"--> Conexión establecida con HDFS en {url}")
 
-        # 9. Iniciamos un bucle para recorrer cada ruta de la lista definida en el paso 5
+        # BUCLE: Recorremos la lista de rutas una por una
         for base_path in rutas_base:
-            # 10. Construimos la ruta completa concatenando la carpeta base con la partición de fecha
+            
+            # Construimos la ruta final uniendo la base + la fecha.
+            # Ejemplo: /data/logs/raw/dt=2023-10-25
             full_path = f"{base_path}/{particion}"
             
-            # 11. Iniciamos un bloque de control de errores específico para la creación de carpetas
+            # BLOQUE DE SEGURIDAD 2 (ESPECÍFICO): LA CARPETA
+            # Si falla una carpeta concreta, capturamos el error aquí dentro
+            # para que el bucle continúe y cree las demás.
             try:
-                # 12. Enviamos la orden de crear el directorio (makedirs crea también las carpetas intermedias)
+                # client.makedirs: Equivalente a 'mkdir -p'.
+                # Crea la carpeta y, si no existen las superiores, las crea también.
                 client.makedirs(full_path)
-                print(f"Creado: {full_path}")
+                print(f"[OK] Creado: {full_path}")
                 
-            # 13. Capturamos errores específicos de ruta (e_path) para que un fallo no detenga el bucle
             except Exception as e_path:
-                print(f"Error creando {full_path}: {e_path}")
+                # Si falla solo esta carpeta, avisamos pero NO paramos el programa.
+                print(f"[ERROR] Falló al crear {full_path}: {e_path}")
 
-    # 14. Capturamos errores fatales de conexión (e_conn) que impiden ejecutar el programa
+    # GESTIÓN DE ERROR FATAL
+    # Aquí caemos si falló el BLOQUE 1 (ej: el servidor Hadoop está apagado).
     except Exception as e_conn:
-        print(f"Error fatal de conexión con HDFS: {e_conn}")
+        print(f"--> ERROR FATAL: No se pudo conectar con HDFS. Detalles: {e_conn}")
 
-# 15. Punto de entrada del script: ejecutamos la función si el archivo se llama directamente
+# ---------------------------------------------------------
+# PUNTO DE ENTRADA
+# ---------------------------------------------------------
+# Asegura que este script se ejecute solo si lo llamamos directamente.
 if __name__ == "__main__":
     crear_directorios_hdfs()

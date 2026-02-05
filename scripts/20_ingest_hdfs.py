@@ -1,118 +1,116 @@
 # 1. Importamos las librerías necesarias
-import os
-import sys
 import subprocess
+import time
 from datetime import datetime
+from pathlib import Path # Pathlib: La forma moderna y segura de manejar rutas de archivos (Windows/Linux)
 
-# 2. Configuración de Fecha
+# ---------------------------------------------------------
+# 2. CONFIGURACIÓN Y RUTAS
+# ---------------------------------------------------------
+
+# Calculamos la fecha de hoy para sincronizarnos con el generador de datos
 DT = datetime.now().strftime("%Y-%m-%d")
 
-# 3. Rutas del Sistema Local (Windows)
-# Calculamos la ruta absoluta de la carpeta donde están los datos generados por el paso anterior
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOCAL_DIR = os.path.join(BASE_DIR, "..", "..", "data_local", DT)
+# Rutas locales (Windows) usando Pathlib
+# __file__: Es la ruta de este script.
+# .resolve(): Obtiene la ruta absoluta completa.
+# .parents[2]: Retrocede 3 carpetas hacia atrás (equivale a cd ../../..)
+# data_local/DT: Es donde el script anterior dejó los archivos CSV/JSON.
+LOCAL_DIR = Path(__file__).resolve().parents[2] / "data_local" / DT
 
-# 4. Mapeo de Destinos en HDFS
-# Diccionario que dice: "Si el archivo contiene X texto, va a la carpeta Y en HDFS"
+# Mapa de destinos en HDFS (Routing)
+# Diccionario que actúa como un semáforo:
+# "Si el archivo contiene 'logs_', envíalo a /data/logs/raw..."
 DESTINOS = {
     "logs_": f"/data/logs/raw/dt={DT}",
     "iot_":  f"/data/iot/raw/dt={DT}"
 }
 
-# 5. Función Auxiliar
-# Esta función nos ahorra escribir "subprocess.run(...)" repetidamente.
-# Ejecuta un comando en la terminal y captura el error (stderr) si falla.
-def run(comando): 
-    subprocess.run(
-        comando, 
-        shell=True,             # Permite usar comandos de shell complejos
-        check=True,             # Lanza una excepción si el comando falla
-        stdout=subprocess.DEVNULL, # Oculta la salida normal (para no ensuciar la pantalla)
-        stderr=subprocess.PIPE     # Captura el mensaje de error para poder leerlo luego
-    )
-
-# 6. Función Principal de Ingesta
+# ---------------------------------------------------------
+# 3. FUNCIÓN PRINCIPAL
+# ---------------------------------------------------------
 def ingestar():
-    print(f"--> Iniciando Ingesta: {DT}")
+    
+    # Iniciamos el cronómetro para medir el rendimiento (KPIs)
+    inicio = time.time()
+    print(f"--> Iniciando Ingesta Controlada: {DT}")
 
-    # 7. Verificación de Seguridad: ¿Docker está vivo?
-    # Antes de empezar, comprobamos si Docker está respondiendo para evitar errores feos.
-    try:
-        run("docker ps")
-    except subprocess.CalledProcessError:
-        print("ERROR CRÍTICO: Docker no está ejecutándose o no está instalado.")
+    # --- CHEQUEO DE SEGURIDAD INICIAL ---
+    # Antes de intentar nada, verificamos si la carpeta de origen existe.
+    # Si no existe, cortamos el programa para evitar errores en cascada.
+    if not LOCAL_DIR.exists():
+        print(f"[AVISO] No hay datos en: {LOCAL_DIR}")
         return
 
-    # 8. Verificación de Datos Locales
-    if not os.path.exists(LOCAL_DIR): 
-        print(f"No se encontraron datos locales en: {LOCAL_DIR}")
-        return
+    # --- FASE 1: PROCESAMIENTO Y CARGA ---
+    # Iteramos sobre cada elemento dentro de la carpeta local
+    for archivo in LOCAL_DIR.iterdir():
+        
+        # Filtro de Seguridad:
+        # iterdir() devuelve todo (archivos y carpetas).
+        # Si encontramos una subcarpeta, la ignoramos con 'continue' para no romper el script.
+        if not archivo.is_file(): continue
 
-    # 9. Bucle Principal: Recorremos los archivos de la carpeta local
-    for archivo in os.listdir(LOCAL_DIR):
-        
-        # 10. Búsqueda Inteligente del Destino
-        # Buscamos en el diccionario DESTINOS qué ruta coincide con el nombre del archivo
-        # Si no hay coincidencia, devuelve None para evitar errores.
-        ruta_hdfs = next((ruta for clave, ruta in DESTINOS.items() if clave in archivo), None)
-        
-        if ruta_hdfs:
-            print(f"Subiendo {archivo}...", end=" ")
+        # Búsqueda de Destino:
+        # Analizamos el nombre del archivo para ver si coincide con alguna clave de nuestro diccionario DESTINOS.
+        # Si encuentra coincidencia devuelve la ruta, si no, devuelve None.
+        destino = next((ruta for clave, ruta in DESTINOS.items() if clave in archivo.name), None)
+
+        if destino:
+            print(f"[PROCESANDO] {archivo.name}...", end=" ")
             
-            # 11. El Pipeline de Ingesta
-            # Como Windows no puede hablar directo con HDFS por problemas de red/puertos,
-            # usamos el contenedor "namenode" como intermediario.
+            # BLOQUE 'TRY-EXCEPT': GESTIÓN DE ERRORES
+            # Si un archivo falla, capturamos el error aquí para que el script 
+            # siga intentándolo con los siguientes archivos.
             try:
+                # --- PASO A: EL PUENTE (Windows -> Contenedor) ---
+                # Windows no puede hablar directamente con HDFS.
+                # Copiamos el archivo físico dentro del contenedor 'namenode' (carpeta /tmp).
+                subprocess.run(f'docker cp "{archivo}" namenode:/tmp/{archivo.name}', shell=True, check=True, stderr=subprocess.PIPE)
                 
-                # Paso A: Copiar archivo de Windows -> Contenedor Namenode (carpeta temporal)
-                ruta_local_abs = os.path.join(LOCAL_DIR, archivo)
-                run(f'docker cp "{ruta_local_abs}" namenode:/tmp/{archivo}')
+                # --- PASO B: LA INGESTA (Contenedor -> HDFS) ---
+                # Una vez el archivo está en Linux (dentro del contenedor), usamos el cliente HDFS nativo.
+                # -put: Sube el archivo.
+                # -f: Fuerza la sobreescritura si ya existe.
+                subprocess.run(f"docker exec namenode hdfs dfs -put -f /tmp/{archivo.name} {destino}/", shell=True, check=True, stderr=subprocess.PIPE)
                 
-                # Paso B: Mover archivo del Contenedor -> HDFS (Sistema Distribuido)
-                # -f fuerza la sobreescritura si ya existe
-                run(f"docker exec namenode hdfs dfs -put -f /tmp/{archivo} {ruta_hdfs}/{archivo}")
-                
-                # Paso D: Limpieza (Borrar el archivo temporal del contenedor)
-                run(f"docker exec -u 0 namenode rm /tmp/{archivo}")
+                # --- PASO C: LIMPIEZA (Housekeeping) ---
+                # Borramos el archivo temporal de /tmp para no llenar el disco del contenedor de basura.
+                # -u 0: Usamos usuario root para asegurar que tenemos permiso de borrarlo.
+                subprocess.run(f"docker exec -u 0 namenode rm /tmp/{archivo.name}", shell=True)
                 
                 print("OK")
 
             except subprocess.CalledProcessError as e:
-                # Si algo falla, decodificamos el mensaje de error de Docker y lo mostramos
-                mensaje_error = e.stderr.strip()
-                print(f"FALLO -> {mensaje_error}")
+                # Si algo falla (Docker apagado, red caída, etc.), mostramos el error limpio.
+                err_msg = e.stderr.decode().strip() if e.stderr else "Error desconocido"
+                print(f"FALLO -> {err_msg}")
 
-    # 12. Generación de Evidencias
-    # Consultamos a HDFS qué ha guardado realmente para verificar el éxito
+    # --- FASE 2: VERIFICACIÓN Y EVIDENCIAS ---
     print("\n" + "="*40)
-    print("EVIDENCIAS EN HDFS (Verificación)")
+    print("EVIDENCIAS EN HDFS (Verificacion)")
     print("="*40)
 
+    # Recorremos las rutas de destino para preguntar a Hadoop qué ha guardado
     for ruta in DESTINOS.values():
         try:
-            # 13. Obtención de Datos Crudos desde Docker
-            # 'check_output' ejecuta el comando y nos devuelve el texto de respuesta
-            # -stat %n: Nos da solo los nombres de archivo
-            raw_ls = subprocess.check_output(f"docker exec namenode hdfs dfs -stat %n {ruta}/*", shell=True, stderr=subprocess.DEVNULL)
-            # -du -s: Nos da el peso total en bytes
-            raw_du = subprocess.check_output(f"docker exec namenode hdfs dfs -du -s {ruta}", shell=True, stderr=subprocess.DEVNULL)
+            print(f"\n[CARPETA] {ruta}")
             
-            # 14. Procesamiento y Formateo (Parsing)
-            # Convertimos los bytes de texto a listas y números Python
-            lista_archivos = raw_ls.decode('utf-8').strip().split('\n')
-            bytes_total = int(raw_du.decode('utf-8').split()[0])
-            megabytes = bytes_total / 1024 / 1024
+            # Ejecutamos 'du -h' (Disk Usage - Human Readable).
+            # Esto nos dice cuánto ocupa la carpeta en MB/GB directamente.
+            subprocess.run(f"docker exec namenode hdfs dfs -du -h {ruta}", shell=True, check=True)
             
-            print(f"\nCarpeta: ({ruta})")
-            print(f"Archivos: {lista_archivos}")
-            print(f"Tamaño Total: {megabytes:.2f} MB")
-
         except subprocess.CalledProcessError:
-            # Si el comando falla (generalmente porque la carpeta está vacía/no existe)
-            print(f"\n{ruta}: Carpeta vacía o no encontrada.")
-        except Exception as e:
-            print(f"\n{ruta}: Error al calcular datos ({e})")
+            # Si el comando falla suele ser porque la carpeta aún no existe (está vacía)
+            print("   (Carpeta vacia o no existe)")
 
-# 15. Punto de Entrada
+    # Cálculo final del tiempo de ejecución
+    fin = time.time()
+    print(f"\n[METRICAS R7] Tiempo Total: {fin - inicio:.2f} segundos")
+
+# ---------------------------------------------------------
+# PUNTO DE ENTRADA
+# ---------------------------------------------------------
+# Asegura que el script solo corre si se ejecuta directamente
 if __name__ == "__main__": 
     ingestar()
