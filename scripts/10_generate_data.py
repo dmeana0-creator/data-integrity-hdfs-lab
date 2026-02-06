@@ -1,32 +1,30 @@
-import os
+# Importamos las librerías necesarias
 import random
-import polars as pl     # Librería 'Polars': Es como Pandas pero mucho más rápida (ideal para grandes volúmenes)
+import polars as pl
 from datetime import datetime
-from faker import Faker # Librería para inventar nombres, emails y datos falsos realistas
+from faker import Faker
+from pathlib import Path
+
+# Función auxiliar (lambda) para obtener la hora exacta del momento.
+# Se usará en los 'print' para saber a qué hora ocurrió cada paso (Logs).
+ahora = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 # ---------------------------------------------------------
 # 1. CONFIGURACIÓN DE RUTAS Y CARPETAS
 # ---------------------------------------------------------
 
-# Truco para trabajar "fuera" del proyecto:
 # __file__ es este archivo. .dirname() saca su carpeta. 
 # Usamos ".." para subir niveles hacia atrás.
 # Objetivo: Guardar los datos en una carpeta 'data_local' separada del código fuente.
-ruta_script = os.path.dirname(os.path.abspath(__file__))
-ruta_fuera_del_repo = os.path.join(ruta_script, "..", "..")
-
-
-
-BASE_DIR = os.path.join(ruta_fuera_del_repo, "data_local")
+BASE_DIR = Path(__file__).resolve().parents[2] / "data_local"
 
 # Definimos la carpeta de destino usando la fecha de hoy.
-# Esto nos ayuda a tener los datos organizados por días (ej: 2026-02-05).
-FECHA_HOY = datetime.now().strftime('%Y-%m-%d')
-OUTPUT_DIR = f"{BASE_DIR}/{FECHA_HOY}"
+DT = datetime.now().strftime('%Y-%m-%d')
+OUTPUT_DIR = BASE_DIR / DT
 
 # Nombres de los archivos finales
-LOG_FILE = f"{OUTPUT_DIR}/logs_{FECHA_HOY}.log"
-IOT_FILE = f"{OUTPUT_DIR}/iot_{FECHA_HOY}.jsonl"
+LOG_FILE = OUTPUT_DIR / f"logs_{DT}.log"
+IOT_FILE = OUTPUT_DIR / f"iot_{DT}.jsonl"
 
 # ---------------------------------------------------------
 # 2. CONFIGURACIÓN DE TAMAÑO Y RENDIMIENTO
@@ -56,7 +54,7 @@ def guardar_como_log(dataframe, ruta_archivo):
 def guardar_como_jsonl(dataframe, ruta_archivo):
     """
     Guarda un dataframe en formato JSON Lines (un objeto JSON por línea).
-    Ideal para datos IoT o NoSQL.
+    Ideal para datos IoT.
     """
     with open(ruta_archivo, "ab") as f:
         dataframe.write_ndjson(f)
@@ -66,16 +64,23 @@ def guardar_como_jsonl(dataframe, ruta_archivo):
 # ---------------------------------------------------------
 def generar_datos():
     
+    print(f"[{ahora()}] [INFO]  --> INICIO GENERADOR DE DATOS | FECHA={DT}")
+    
     # --- PREPARACIÓN DEL ENTORNO ---
     # Creamos la carpeta física. exist_ok=True evita errores si ya existe.
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    # parents=True crea las carpetas intermedias si faltan.
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # .resolve() nos da la ruta absoluta para imprimirla
+    print(f"[{ahora()}] [INFO]  Directorio de salida: {OUTPUT_DIR.resolve()}")
     
     # Limpieza inicial: Si existen archivos de una ejecución anterior, los borramos
     # para empezar de cero y no duplicar datos.
-    if os.path.exists(LOG_FILE): os.remove(LOG_FILE)
-    if os.path.exists(IOT_FILE): os.remove(IOT_FILE)
+    if LOG_FILE.exists(): LOG_FILE.unlink()
+    print(f"[{ahora()}] [INFO]  Limpiando archivo anterior: {LOG_FILE.name}")
     
-    print(f"--> Iniciando generación de datos en: {os.path.abspath(OUTPUT_DIR)}")
+    if IOT_FILE.exists(): IOT_FILE.unlink()
+    print(f"[{ahora()}] [INFO]  Limpiando archivo anterior: {IOT_FILE.name}")
+    
 
     # --- OPTIMIZACIÓN DE DATOS FALSOS ---
     # En lugar de generar un nombre nuevo cada vez (muy lento),
@@ -86,19 +91,23 @@ def generar_datos():
     LISTA_SENSORES = [f"sensor_{i:04d}" for i in range(500)]
     ACCIONES = ["LOGIN", "LOGOUT", "COMPRA", "ERROR", "CLICK"]
     ESTADOS = ["INFO", "ALERTA", "CRITICO", "DEBUG"]
+    
+    print(f"[{ahora()}] [INFO]  Comenzando bucle de generación masiva (Batch={LOTE} filas)")
 
     # --- BUCLE INFINITO DE GENERACIÓN ---
     while True:
         
         # 1. MEDICIÓN
         # Comprobamos cuánto pesan los archivos en este momento.
-        peso_log = os.path.getsize(LOG_FILE) if os.path.exists(LOG_FILE) else 0
-        peso_iot = os.path.getsize(IOT_FILE) if os.path.exists(IOT_FILE) else 0
+        # .stat().st_size obtiene el tamaño en bytes del archivo.
+        peso_log = LOG_FILE.stat().st_size if LOG_FILE.exists() else 0
+        peso_iot = IOT_FILE.stat().st_size if IOT_FILE.exists() else 0
         
         # 2. CONDICIÓN DE SALIDA (META ALCANZADA)
         # Si AMBOS archivos superan el tamaño objetivo, terminamos el bucle.
         if peso_log >= META_BYTES and peso_iot >= META_BYTES:
-            print(f"\n[OK] Meta alcanzada. Archivos generados correctamente.")
+            print("") 
+            print(f"[{ahora()}] [OK]    META ALCANZADA (Logs: {peso_log//1024//1024}MB | IoT: {peso_iot//1024//1024}MB)")
             break
 
         # 3. GENERACIÓN DE LOGS (CSV)
@@ -125,11 +134,13 @@ def generar_datos():
             guardar_como_jsonl(df_iot, IOT_FILE)
 
         # 5. FEEDBACK AL USUARIO
-        # Calculamos MB para mostrarlo bonito.
+        # Calculamos MB para mostrarlo.
         # end='\r' hace que la línea se sobrescriba a sí misma (efecto de carga).
-        mb_actual_log = peso_log // 1024 // 1024
-        mb_actual_iot = peso_iot // 1024 // 1024
-        print(f"Progreso -> Logs: {mb_actual_log} MB | IoT: {mb_actual_iot} MB", end='\r')
+        mb_log = peso_log // 1024 // 1024
+        mb_iot = peso_iot // 1024 // 1024
+        print(f"[{ahora()}] [PROG]  Generando... Logs: {mb_log} MB / IoT: {mb_iot} MB", end='\r')
+        
+    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

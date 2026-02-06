@@ -1,14 +1,18 @@
+# Importamos las librerías necesarias
 import subprocess
 import time
+
+# Función auxiliar (lambda) para obtener la hora exacta del momento.
+# Se usará en los 'print' para saber a qué hora ocurrió cada paso (Logs).
+ahora = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 # ---------------------------------------------------------
 # 1. CONFIGURACIÓN DEL ESCENARIO DE FALLO
 # ---------------------------------------------------------
-# Definimos las "víctimas": los nombres exactos de los contenedores Docker que vamos a apagar.
-# Simula que dos servidores del clúster se han quedado sin electricidad de repente.
+# Definimos los datanodes que vamos a tirar: los nombres exactos de los contenedores Docker que vamos a apagar.
 NODOS_A_PARAR = "clustera-dnnm-1 clustera-dnnm-2"
 
-print("--- INICIO SIMULACION DE FALLO (CHAOS TESTING) ---")
+print("--- INICIO SIMULACION DE FALLO ---")
 
 # ---------------------------------------------------------
 # 2. EJECUCIÓN PARALELA (INGESTA)
@@ -24,7 +28,6 @@ proceso_ingesta = subprocess.Popen("python ./20_ingest_hdfs.py", shell=True)
 # ---------------------------------------------------------
 # Esperamos 5 segundos.
 # Esto da tiempo a que el script de ingesta conecte con HDFS y empiece a enviar paquetes de datos.
-# Queremos que el corte ocurra en el momento de máxima actividad.
 time.sleep(5)
 
 # ---------------------------------------------------------
@@ -47,6 +50,5 @@ proceso_ingesta.wait()
 # 6. ANÁLISIS FORENSE (AUDITORÍA)
 # ---------------------------------------------------------
 # Una vez que todo ha terminado, lanzamos la auditoría.
-# Esto nos dirá si hemos perdido datos (CORRUPT) o si HDFS ha aguantado el golpe (HEALTHY).
 print("4. Auditoría final (Evaluación de daños):")
 subprocess.run("python ./30_fsck_data_audit.py", shell=True)

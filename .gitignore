@@ -1,8 +1,14 @@
-# --- 1. Carpeta específica que querías ignorar ---
-# Ignora solo la carpeta notebooks dentro de docker/clusterA
 docker/clusterA/notebooks/
 
-# --- 2. Basura de Jupyter Notebooks ---
-# Archivos temporales de autoguardado
 .ipynb_checkpoints
-*/.ipynb_checkpoints/
+**/.ipynb_checkpoints
+
+__pycache__/
+*.pyc
+
+
+data_local/
+
+
+env/
+.env

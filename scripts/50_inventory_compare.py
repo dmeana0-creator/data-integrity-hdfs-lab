@@ -6,15 +6,18 @@ from datetime import datetime
 # 2. CONFIGURACION Y CONSTANTES
 # ---------------------------------------------------------
 
-# Calculamos la fecha de hoy (ej: "2026-02-05")
+# Calculamos la fecha de hoy
 # Esto define qué carpeta del día vamos a auditar.
 DT = datetime.now().strftime('%Y-%m-%d')
+
+# Función auxiliar (lambda) para obtener la hora exacta del momento.
+# Se usará en los 'print' para saber a qué hora ocurrió cada paso (Logs).
+ahora = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 # Familias de datos a revisar
 FAMILIAS = ["logs", "iot"]
 
 # Ruta donde guardaremos el informe final dentro del clúster HDFS
-# Notar que usamos una partición de fecha 'dt=...' para mantener el orden.
 HDFS_DIR = f"/audit/inventory/dt={DT}"
 
 # ---------------------------------------------------------
@@ -27,7 +30,6 @@ def get_hdfs_files(ruta):
     """
     try:
         # Comando HDFS: 'hdfs dfs -stat'
-        # Es mucho más rápido que 'ls' para scripts porque podemos formatear la salida.
         # %n = Nombre del archivo
         # %b = Tamaño en bytes
         cmd = f'docker exec namenode hdfs dfs -stat "%n %b" {ruta}/*'
@@ -36,8 +38,7 @@ def get_hdfs_files(ruta):
         # text=True: Nos devuelve un string (texto), no bytes.
         out = subprocess.check_output(cmd, shell=True, text=True)
         
-        # Parsing (Procesamiento del texto):
-        # Convertimos la salida de texto plano en un diccionario Python útil.
+        # Convertimos la salida de texto plano en un diccionario Python.
         # splitlines(): Divide por líneas.
         # split(): Divide nombre y tamaño.
         return {line.split()[0]: int(line.split()[1]) for line in out.splitlines()}
@@ -47,19 +48,21 @@ def get_hdfs_files(ruta):
         return {}
 
 # ---------------------------------------------------------
-# 4. FUNCION PRINCIPAL: LA AUDITORIA
+# 4. FUNCION PRINCIPAL: EL INVENTARIO
 # ---------------------------------------------------------
-def main():
+def inventory():
+    
+    print(f"[{ahora()}] [INFO]  --> INICIO AUDITORÍA DE INVENTARIO | FECHA={DT}")
     
     # Creamos una lista para ir guardando las líneas del informe en memoria
     reporte_lines = [f"INVENTARIO {DT}", "-"*20]
 
     # Bucle Principal: Analizamos cada familia de datos (Logs y IoT)
     for fam in FAMILIAS:
-        print(f"Analizando: {fam}...")
+        print(f"[{ahora()}] [INFO]  Analizando familia: {fam.upper()}...")
         
         # Definimos las rutas a comparar
-        path_src = f"/data/{fam}/raw/dt={DT}"   # Origen (Datos "calientes")
+        path_src = f"/data/{fam}/raw/dt={DT}"   # Origen (Datos en crudo)
         path_dst = f"/backup/{fam}/raw/dt={DT}" # Destino (Copia de seguridad)
         
         # Obtenemos los inventarios (Diccionarios con nombre y peso)
@@ -68,12 +71,13 @@ def main():
 
         # Añadimos la evidencia cruda al reporte
         reporte_lines.append(f"\n--- EVIDENCIAS {fam.upper()} ---")
+        
         for arc, tam in src.items():
             reporte_lines.append(f"ORIGEN:  {path_src}/{arc} ({tam} bytes)")
         for arc, tam in dst.items():
             reporte_lines.append(f"DESTINO: {path_dst}/{arc} ({tam} bytes)")
         
-        # --- LOGICA DE COMPARACION (INTEGRIDAD) ---
+        # --- LOGICA DE COMPARACION ---
         
         # CASO 1: Archivos Perdidos (Missing Files)
         # Usamos Teoría de Conjuntos (Sets).
@@ -87,36 +91,49 @@ def main():
 
         # Veredicto
         if not missing and not bad_size:
-            reporte_lines.append(f"{fam}: OK (Integridad verificada)")
+            msg = f"{fam}: OK (Integridad verificada)"
+            print(f"[{ahora()}] [OK]    {msg}")
+            reporte_lines.append(msg)
         else:
-            reporte_lines.append(f"{fam} ERROR -> Faltan: {missing}, Mal tamaño: {bad_size}")
+            msg = f"{fam} ERROR -> Faltan: {missing}, Mal tamaño: {bad_size}"
+            print(f"[{ahora()}] [ERROR] Discrepancia detectada en {fam}")
+            print(f"                      -> Faltan: {missing}")
+            print(f"                      -> Corruptos: {bad_size}")
+            reporte_lines.append(msg)
 
-    # --- GUARDAR REPORTE (TRUCO PRO) ---
+
+    # --- GUARDAR REPORTE ---
+    print(f"[{ahora()}] [INFO]  Generando reporte final...")
     
     # Unimos todas las líneas en un solo bloque de texto
     texto_final = "\n".join(reporte_lines)
+    nombre_reporte = f"reporte_inventario_dt={DT}.txt"
     
-    # Truco de Streaming (Tuberías):
-    # En lugar de guardar un archivo .txt en Windows y luego subirlo...
-    # ...se lo pasamos directamente a HDFS desde la memoria RAM.
+    # Pasamos directamente el reporte a HDFS desde la memoria RAM.
     
     # -i: Modo interactivo (permite recibir datos).
     # -put - : El guion solo significa "lee de la entrada estándar (stdin)".
-    cmd_put = f"docker exec -i namenode hdfs dfs -put -f - {HDFS_DIR}/reporte.txt"
+    cmd_put = f"docker exec -i namenode hdfs dfs -put -f - {HDFS_DIR}/{nombre_reporte}"
     
     try:
         # input=texto_final: Aquí inyectamos el texto al comando.
         subprocess.run(cmd_put, shell=True, check=True, input=texto_final, text=True)
         
-        print(f"\n[EXITO] Reporte guardado en HDFS: {HDFS_DIR}/reporte.txt")
-        print("--- Vista previa del reporte ---")
+        print(f"[{ahora()}] [OK]    Reporte guardado en HDFS: {HDFS_DIR}/{nombre_reporte}")
+        
+        print("\n" + "-"*60)
+        print(f"[{ahora()}] [INFO]  VISTA PREVIA DEL REPORTE")
+        print("-"*(60))
         print(texto_final)
+        print("-"*(60))
         
     except subprocess.CalledProcessError:
-        print("[ERROR CRITICO] No se pudo guardar el reporte en HDFS.")
+        print(f"[{ahora()}] [FATAL] No se pudo guardar el reporte en HDFS.")
+    
+    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    main()
+    inventory()

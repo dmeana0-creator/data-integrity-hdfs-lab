@@ -1,17 +1,20 @@
-# 1. Importamos las librerías necesarias
+# Importamos las librerías necesarias
 import subprocess
 import time
 from datetime import datetime
-from pathlib import Path # Pathlib: La forma moderna y segura de manejar rutas de archivos (Windows/Linux)
+from pathlib import Path 
+
+# Función auxiliar (lambda) para obtener la hora exacta del momento.
+# Se usará en los 'print' para saber a qué hora ocurrió cada paso (Logs).
+ahora = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 # ---------------------------------------------------------
-# 2. CONFIGURACIÓN Y RUTAS
+# 1. CONFIGURACIÓN Y RUTAS
 # ---------------------------------------------------------
 
 # Calculamos la fecha de hoy para sincronizarnos con el generador de datos
 DT = datetime.now().strftime("%Y-%m-%d")
 
-# Rutas locales (Windows) usando Pathlib
 # __file__: Es la ruta de este script.
 # .resolve(): Obtiene la ruta absoluta completa.
 # .parents[2]: Retrocede 3 carpetas hacia atrás (equivale a cd ../../..)
@@ -33,15 +36,19 @@ def ingestar():
     
     # Iniciamos el cronómetro para medir el rendimiento (KPIs)
     inicio = time.time()
-    print(f"--> Iniciando Ingesta Controlada: {DT}")
+    print(f"[{ahora()}] [INFO]  --> INICIO PROCESO DE INGESTA | FECHA={DT}")
 
     # --- CHEQUEO DE SEGURIDAD INICIAL ---
     # Antes de intentar nada, verificamos si la carpeta de origen existe.
     # Si no existe, cortamos el programa para evitar errores en cascada.
     if not LOCAL_DIR.exists():
-        print(f"[AVISO] No hay datos en: {LOCAL_DIR}")
+        print(f"[{ahora()}] [WARN]  No se encontraron datos locales en:")
+        print(f"                      -> {LOCAL_DIR}")
+        print(f"[{ahora()}] [INFO]  Abortando proceso de forma segura.")
         return
 
+    print(f"[{ahora()}] [INFO]  Directorio local detectado: {LOCAL_DIR}")
+    
     # --- FASE 1: PROCESAMIENTO Y CARGA ---
     # Iteramos sobre cada elemento dentro de la carpeta local
     for archivo in LOCAL_DIR.iterdir():
@@ -57,7 +64,7 @@ def ingestar():
         destino = next((ruta for clave, ruta in DESTINOS.items() if clave in archivo.name), None)
 
         if destino:
-            print(f"[PROCESANDO] {archivo.name}...", end=" ")
+            print(f"[{ahora()}] [INFO]  Procesando: {archivo.name}")
             
             # BLOQUE 'TRY-EXCEPT': GESTIÓN DE ERRORES
             # Si un archivo falla, capturamos el error aquí para que el script 
@@ -79,17 +86,18 @@ def ingestar():
                 # -u 0: Usamos usuario root para asegurar que tenemos permiso de borrarlo.
                 subprocess.run(f"docker exec -u 0 namenode rm /tmp/{archivo.name}", shell=True)
                 
-                print("OK")
+                print(f"[{ahora()}] [OK]    Carga exitosa -> {destino}")
 
             except subprocess.CalledProcessError as e:
                 # Si algo falla (Docker apagado, red caída, etc.), mostramos el error limpio.
-                err_msg = e.stderr.decode().strip() if e.stderr else "Error desconocido"
-                print(f"FALLO -> {err_msg}")
+                    mensaje = e.stderr.decode().strip() if e.stderr else "Error desconocido"
+                    print(f"[{ahora()}] [ERROR] Falló la ingesta de {archivo.name}")
+                    print(f"                      -> Detalles: {mensaje}")
 
     # --- FASE 2: VERIFICACIÓN Y EVIDENCIAS ---
-    print("\n" + "="*40)
-    print("EVIDENCIAS EN HDFS (Verificacion)")
-    print("="*40)
+    print("\n" + "-"*60)
+    print(f"[{ahora()}] [INFO]  GENERANDO REPORTE DE EVIDENCIAS (HDFS)")
+    print("-"*(60))
 
     # Recorremos las rutas de destino para preguntar a Hadoop qué ha guardado
     for ruta in DESTINOS.values():
@@ -101,12 +109,15 @@ def ingestar():
             subprocess.run(f"docker exec namenode hdfs dfs -du -h {ruta}", shell=True, check=True)
             
         except subprocess.CalledProcessError:
-            # Si el comando falla suele ser porque la carpeta aún no existe (está vacía)
-            print("   (Carpeta vacia o no existe)")
+             print(f"[{ahora()}] [WARN]  Carpeta vacía o no existe en HDFS.")
+        except Exception as e:
+             print(f"[{ahora()}] [ERROR] Error calculando métricas: {e}")
 
     # Cálculo final del tiempo de ejecución
     fin = time.time()
-    print(f"\n[METRICAS R7] Tiempo Total: {fin - inicio:.2f} segundos")
+    print("-"*(60))
+    print(f"[{ahora()}] [METRICAS] Tiempo Total de Ingestion: {fin - inicio:.2f} segundos")
+    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

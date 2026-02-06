@@ -1,20 +1,25 @@
+# Importamos las librerías necesarias
 import subprocess
 from datetime import datetime
 from pathlib import Path
+
+# Función auxiliar (lambda) para obtener la hora exacta del momento.
+# Se usará en los 'print' para saber a qué hora ocurrió cada paso (Logs).
+ahora = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 # ---------------------------------------------------------
 # 1. CONFIGURACIÓN DE RUTAS Y ENTORNO
 # ---------------------------------------------------------
 
-# Navegación inteligente por el árbol de directorios:
+# Navegación por el árbol de directorios:
 # __file__: Este archivo script.
 # .resolve(): Ruta absoluta.
 # .parent: Carpeta 'scripts'.
 # .parent: Carpeta raíz del proyecto.
 RAIZ_PROYECTO = Path(__file__).resolve().parent.parent
 
-# Definimos la carpeta compartida ("Volumen") entre Windows y Docker.
-# IMPORTANTE: Guardamos el archivo aquí para que luego, cuando abras Jupyter
+# Definimos la carpeta compartida entre tu equipo y Docker.
+# Guardamos el archivo aquí para que luego, cuando abras Jupyter
 # dentro del contenedor, puedas ver este fichero sin tener que copiarlo manualmente.
 # Ruta: proyecto/docker/clusterA/notebooks/raw_audits
 DIR_COMPARTIDO = RAIZ_PROYECTO / "docker" / "clusterA" / "notebooks" / "raw_audits"
@@ -24,7 +29,7 @@ DIR_COMPARTIDO.mkdir(parents=True, exist_ok=True)
 
 # Configuración de fecha y nombres de archivo
 DT = datetime.now().strftime('%Y-%m-%d')
-NOMBRE_ARCHIVO = f"fsck_data_{DT}.txt"
+NOMBRE_ARCHIVO = f"fsck_data_dt={DT}.txt"
 
 # Ruta completa en tu disco duro (Windows)
 RUTA_LOCAL_FINAL = DIR_COMPARTIDO / NOMBRE_ARCHIVO
@@ -46,17 +51,17 @@ def run_silent(comando):
 # 3. FUNCIÓN PRINCIPAL DE AUDITORÍA
 # ---------------------------------------------------------
 def auditar():
-    print(f"--> Iniciando Auditoría FSCK (File System Check): {DT}")
-    print(f"    Ruta local compartida: {RUTA_LOCAL_FINAL}")
+    print(f"[{ahora()}] [INFO]  --> INICIO AUDITORÍA FSCK (FILE SYSTEM CHECK) | FECHA={DT}")
+    print(f"[{ahora()}] [INFO]  Ruta local de evidencia: {RUTA_LOCAL_FINAL}")
 
     try:
         # --- PASO 1: EJECUCIÓN DEL DIAGNÓSTICO (FSCK) ---
-        # Ejecutamos el comando 'hdfs fsck
-        # check=False: IMPORTANTE. Si fsck encuentra errores (corrupción), devuelve código de salida 1.
+        # Ejecutamos el comando hdfs fsck
+        # check=False Si fsck encuentra errores (corrupción), devuelve código de salida 1.
         # No queremos que el script de Python falle si HDFS está "enfermo", queremos ver el reporte.
         print("1) Ejecutando análisis fsck en /data...")
         
-        res = subprocess.run(
+        fsck = subprocess.run(
             "docker exec namenode hdfs fsck /data -files -blocks -locations", 
             shell=True, 
             capture_output=True, # Capturamos el texto de respuesta en una variable
@@ -65,18 +70,20 @@ def auditar():
         )
         
         # Guardamos el texto del reporte en una variable Python
-        reporte = res.stdout
+        reporte = fsck.stdout
+        print(f"[{ahora()}] [OK]    Diagnóstico finalizado.")
         
         # --- PASO 2: GUARDADO LOCAL (PARA JUPYTER) ---
         # Escribimos el reporte en la carpeta que Jupyter puede ver.
-        print(f"2) Guardando evidencia localmente...")
+        print(f"[{ahora()}] [INFO]  Guardando reporte localmente...")
         RUTA_LOCAL_FINAL.write_text(reporte, encoding="utf-8")
+        print(f"[{ahora()}] [OK]    Reporte fsck de /data guardado en disco.")
         
-        # --- PASO 3: SUBIDA A HDFS (PERSISTENCIA) ---
+        # --- PASO 3: SUBIDA A HDFS ---
         # Subimos el propio reporte de salud a HDFS para tener un histórico.
-        print("3) Subiendo reporte a HDFS (Backup)...")
+        print(f"[{ahora()}] [INFO]  Subiendo reporte fsck de /data a HDFS...")
         
-        # A. Copiamos de Windows -> Contenedor (/tmp)
+        # A. Copiamos de local -> Contenedor (/tmp)
         run_silent(f'docker cp "{RUTA_LOCAL_FINAL}" namenode:/tmp/{NOMBRE_ARCHIVO}')
         
         # B. Movemos de Contenedor -> HDFS
@@ -87,16 +94,16 @@ def auditar():
         # C. Limpiamos la basura del contenedor
         # Usamos -u 0 (root) para asegurar permisos de borrado
         run_silent(f"docker exec -u 0 namenode rm /tmp/{NOMBRE_ARCHIVO}")
-
-        # --- REPORTE FINAL ---
-        print("\n[EXITO] Proceso completado.")
-        print(f" - Disponible en Jupyter: notebooks/raw_audits/{NOMBRE_ARCHIVO}")
-        print(f" - Disponible en HDFS:    {DESTINO_HDFS}/{NOMBRE_ARCHIVO}")
         
-        print("\n" + "="*40)
-        print("RESUMEN DEL REPORTE GENERADO:")
-        print(reporte) # Imprimimos el resultado en pantalla para verlo rápido
-        print("="*40)
+        # --- REPORTE FINAL ---
+        print("\n" + "-"*60)
+        print(f"[{ahora()}] [OK]    Carga exitosa -> {DESTINO_HDFS}/{NOMBRE_ARCHIVO}")
+        print(f"[{ahora()}] [INFO]  RESUMEN DEL REPORTE GENERADO")
+        print("-"*(60))
+        print(reporte) # mostramos el reporte fsck por pantalla 
+        print("-"*(60))
+        
+        print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
 
     except Exception as e:
         print(f"[ERROR] Falló la auditoría: {e}")

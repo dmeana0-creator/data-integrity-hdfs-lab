@@ -1,27 +1,28 @@
-import subprocess  # Librería para ejecutar comandos de terminal (como bash) desde Python
-from datetime import datetime  # Librería para manejar fechas y horas
+# 1. Importamos las librerías necesarias
+import subprocess
+from datetime import datetime
 import time
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN GENERAL
+# 2. CONFIGURACIÓN GENERAL
 # ---------------------------------------------------------
 
-# 1. Calculamos la fecha de hoy automáticamente (Formato: Año-Mes-Día)
+# Calculamos la fecha de hoy
 # Esto sirve para buscar la carpeta de datos correspondiente al día actual.
 DT = datetime.now().strftime('%Y-%m-%d')
 
-# 2. Lista de carpetas (familias) que queremos copiar.
+# Lista de carpetas (familias) que queremos copiar.
 # El script recorrerá esta lista una por una.
 FAMILIAS = ["logs", "iot"]
 
-# 3. Función auxiliar (lambda) para obtener la hora exacta del momento.
+# Función auxiliar (lambda) para obtener la hora exacta del momento.
 # Se usará en los 'print' para saber a qué hora ocurrió cada paso (Logs).
 ahora = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 print(f"[{ahora()}] --> INICIO BACKUP DT={DT}")
 
 # ---------------------------------------------------------
-# FUNCIÓN PRINCIPAL DE BACKUP
+# 3. FUNCIÓN PRINCIPAL DE BACKUP
 # ---------------------------------------------------------
 def backup():
     inicio = time.time()
@@ -84,7 +85,8 @@ def backup():
     
     print(f"\n[{ahora()}] --> FIN DEL PROCESO")
 
-# Punto de entrada estándar de Python. 
-# Asegura que el script solo se ejecute si lo lanzamos directamente.
+# ---------------------------------------------------------
+# PUNTO DE ENTRADA
+# ---------------------------------------------------------
 if __name__ == "__main__":
     backup()
