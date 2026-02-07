@@ -141,6 +141,7 @@ def generar_datos():
         print(f"[{ahora()}] [PROG]  Generando... Logs: {mb_log} MB / IoT: {mb_iot} MB", end='\r')
         
     print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE GENERACIÓN DE DATOS")
+    print("="*60 + "\n")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

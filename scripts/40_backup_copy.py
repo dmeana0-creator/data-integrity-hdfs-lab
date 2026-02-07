@@ -19,7 +19,7 @@ FAMILIAS = ["logs", "iot"]
 # Se usará en los 'print' para saber a qué hora ocurrió cada paso (Logs).
 ahora = lambda: datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-print(f"[{ahora()}] --> INICIO BACKUP DT={DT}")
+print(f"[{ahora()}] --> INICIO PROCESO DE BACKUP DT={DT}")
 
 # ---------------------------------------------------------
 # 3. FUNCIÓN PRINCIPAL DE BACKUP
@@ -84,6 +84,7 @@ def backup():
     print(f"\n[METRICAS R7] Tiempo de Copia/Migración: {duracion:.2f} segundos")
     
     print(f"\n[{ahora()}] --> FIN DEL PROCESO DE BACKUP")
+    print("="*60 + "\n")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

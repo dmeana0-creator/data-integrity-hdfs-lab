@@ -51,6 +51,7 @@ def run_silent(comando):
 # 3. FUNCIÓN PRINCIPAL DE AUDITORÍA
 # ---------------------------------------------------------
 def auditar():
+
     print(f"[{ahora()}] [INFO]  --> INICIO AUDITORÍA FSCK EN /backup | FECHA={DT}")
     print(f"[{ahora()}] [INFO]  Ruta local de evidencia: {RUTA_LOCAL_FINAL}")
 
@@ -103,7 +104,8 @@ def auditar():
         print("-"*(60))
         
         print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE AUDITORÍA SOBRE /backup")
-
+        print("="*60 + "\n")
+        
     except Exception as e:
         print(f"[ERROR] Falló la auditoría: {e}")
 

@@ -93,7 +93,7 @@ def crear_directorios_hdfs():
         print(f"                      -> Detalle: {e_conn}")
 
     print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE CREACIÓN DE DIRECTORIOS")
-    
+    print("="*60 + "\n")
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA
 # ---------------------------------------------------------

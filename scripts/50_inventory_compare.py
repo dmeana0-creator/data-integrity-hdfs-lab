@@ -131,6 +131,7 @@ def inventory():
         print(f"[{ahora()}] [FATAL] No se pudo guardar el reporte en HDFS.")
     
     print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE INVENTARIO")
+    print("="*60 + "\n")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

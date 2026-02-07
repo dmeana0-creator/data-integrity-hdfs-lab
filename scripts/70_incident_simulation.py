@@ -53,13 +53,34 @@ print(f"[{ahora()}] [INFO]  3. Esperando reacción del script de ingesta...")
 proceso_ingesta.wait()
 
 # ---------------------------------------------------------
-# 6. ANÁLISIS FORENSE (AUDITORÍA)
+# 6. FASE DE ESPERA
+# ---------------------------------------------------------
+# Hadoop tarda un tiempo en reflejar en la auditoria fsck lo que está ocurriendo.
+# Damos 600 segundos (10 minutos) para asegurar que este proceso termine.
+TIEMPO_ESPERA = 600 # 10 minutos
+    
+print(f"[{ahora()}] [INFO]  4. Iniciando periodo de espera...")
+print(f"[{ahora()}] [WARN]      Esperando {TIEMPO_ESPERA} segundos ({TIEMPO_ESPERA//60} min) para reflejar el fallo en la auditoria.")
+print(f"[{ahora()}] [INFO]      (El NameNode está procesando el fallo..)")
+    
+    # Barra de progreso sencilla para no parecer que se ha colgado
+    # Dividimos la espera en bloques de 1 minuto para dar feedback
+for i in range(TIEMPO_ESPERA // 60):
+    time.sleep(60)
+    min_restantes = (TIEMPO_ESPERA // 60) - (i + 1)
+    print(f"[{ahora()}] [PROG]      ... Sistema procesando. Restan {min_restantes} min...")
+
+print(f"[{ahora()}] [OK]    Tiempo de espera finalizado.")
+
+# ---------------------------------------------------------
+# 7. AUDITORÍA FSCK
 # ---------------------------------------------------------
 # Una vez que todo ha terminado, lanzamos la auditoría.
 print("\n" + "-"*60)
-print(f"[{ahora()}] [INFO]  4. INICIANDO AUDITORÍA FSCK")
+print(f"[{ahora()}] [INFO]  5. INICIANDO AUDITORÍA FSCK")
 print("-"*(60))
 
 subprocess.run("python ./30_fsck_data_audit.py", shell=True)
 
 print(f"[{ahora()}] [INFO]  --> FIN DE LA SIMULACIÓN DE FALLO")
+print("="*60 + "\n")

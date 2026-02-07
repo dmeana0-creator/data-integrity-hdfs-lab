@@ -62,3 +62,4 @@ print("-"*(60))
 subprocess.run("python ./30_fsck_data_audit.py", shell=True)
 
 print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE RECUPERACIÓN")
+print("="*60 + "\n")

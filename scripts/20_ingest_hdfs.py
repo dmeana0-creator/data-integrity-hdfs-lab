@@ -36,6 +36,7 @@ def ingestar():
     
     # Iniciamos el cronómetro para medir el rendimiento (KPIs)
     inicio = time.time()
+    
     print(f"[{ahora()}] [INFO]  --> INICIO PROCESO DE INGESTA | FECHA={DT}")
 
     # --- CHEQUEO DE SEGURIDAD INICIAL ---
@@ -119,7 +120,8 @@ def ingestar():
     print(f"[{ahora()}] [METRICAS] Tiempo Total de Ingestion: {fin - inicio:.2f} segundos")
     
     print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE INGESTA DE DATOS")
-
+    print("="*60 + "\n")
+    
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA
 # ---------------------------------------------------------
