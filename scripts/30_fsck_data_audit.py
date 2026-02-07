@@ -51,7 +51,7 @@ def run_silent(comando):
 # 3. FUNCIÓN PRINCIPAL DE AUDITORÍA
 # ---------------------------------------------------------
 def auditar():
-    print(f"[{ahora()}] [INFO]  --> INICIO AUDITORÍA FSCK (FILE SYSTEM CHECK) | FECHA={DT}")
+    print(f"[{ahora()}] [INFO]  --> INICIO AUDITORÍA FSCK EN /data | FECHA={DT}")
     print(f"[{ahora()}] [INFO]  Ruta local de evidencia: {RUTA_LOCAL_FINAL}")
 
     try:
@@ -59,7 +59,6 @@ def auditar():
         # Ejecutamos el comando hdfs fsck
         # check=False Si fsck encuentra errores (corrupción), devuelve código de salida 1.
         # No queremos que el script de Python falle si HDFS está "enfermo", queremos ver el reporte.
-        print("1) Ejecutando análisis fsck en /data...")
         
         fsck = subprocess.run(
             "docker exec namenode hdfs fsck /data -files -blocks -locations", 
@@ -102,8 +101,7 @@ def auditar():
         print("-"*(60))
         print(reporte) # mostramos el reporte fsck por pantalla 
         print("-"*(60))
-        
-        print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
+        print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE AUDITORÍA SOBRE /data")
 
     except Exception as e:
         print(f"[ERROR] Falló la auditoría: {e}")

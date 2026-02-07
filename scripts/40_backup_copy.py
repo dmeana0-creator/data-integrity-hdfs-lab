@@ -83,7 +83,7 @@ def backup():
     
     print(f"\n[METRICAS R7] Tiempo de Copia/Migración: {duracion:.2f} segundos")
     
-    print(f"\n[{ahora()}] --> FIN DEL PROCESO")
+    print(f"\n[{ahora()}] --> FIN DEL PROCESO DE BACKUP")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

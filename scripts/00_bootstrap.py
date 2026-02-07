@@ -92,7 +92,7 @@ def crear_directorios_hdfs():
         print(f"                      -> Asegúrate de que Docker está corriendo.")
         print(f"                      -> Detalle: {e_conn}")
 
-    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
+    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE CREACIÓN DE DIRECTORIOS")
     
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

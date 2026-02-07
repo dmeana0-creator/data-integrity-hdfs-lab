@@ -140,7 +140,7 @@ def generar_datos():
         mb_iot = peso_iot // 1024 // 1024
         print(f"[{ahora()}] [PROG]  Generando... Logs: {mb_log} MB / IoT: {mb_iot} MB", end='\r')
         
-    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
+    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE GENERACIÓN DE DATOS")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

@@ -117,7 +117,8 @@ def ingestar():
     fin = time.time()
     print("-"*(60))
     print(f"[{ahora()}] [METRICAS] Tiempo Total de Ingestion: {fin - inicio:.2f} segundos")
-    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
+    
+    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE INGESTA DE DATOS")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA

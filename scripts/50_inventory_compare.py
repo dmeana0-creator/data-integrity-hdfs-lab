@@ -130,7 +130,7 @@ def inventory():
     except subprocess.CalledProcessError:
         print(f"[{ahora()}] [FATAL] No se pudo guardar el reporte en HDFS.")
     
-    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO")
+    print(f"[{ahora()}] [INFO]  --> FIN DEL PROCESO DE INVENTARIO")
 
 # ---------------------------------------------------------
 # PUNTO DE ENTRADA
