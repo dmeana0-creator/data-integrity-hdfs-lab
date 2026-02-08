@@ -16,25 +16,39 @@ A continuación se nos muestra los datanodes vivos y sus características en rel
 ## 2) Auditoría fsck
 
 ## 2.1) Auditoría fsck sobre /data
-- Captura Auditoría fsck sobre /data
-![Captura Auditoría fsck sobre /data]()
+- Capturas Auditoría fsck sobre /data
+![Captura 1 Auditoría fsck sobre /data](../img/fsck_data_captura_1.png)
+![Captura 2 Auditoría fsck sobre /data](../img/fsck_data_captura_2.png)
 
 - Captura resumen de la Auditoría fsck sobre /data
-![Captura resumen de la Auditoría fsck sobre /data]()
+![Captura resumen de la Auditoría fsck sobre /data](../img/resumen_csv_data.png)
+
+- Captura resumen de la Auditoría fsck sobre /data en HDFS (9870)
+![Captura resumen de la Auditoría fsck sobre /data en HDFS (9870)](../img/resumen_data_9870.png)
 
 ## 2.2) Auditoría fsck sobre /backup
-- Captura Auditoría fsck sobre /backup
-![Captura Auditoría fsck sobre /backup]()
+- Capturas Auditoría fsck sobre /backup
+![Captura 1 Auditoría fsck sobre /backup](../img/fsck_backup_captura_1.png)
+![Captura 2 Auditoría fsck sobre /backup](../img/fsck_backup_captura_2.png)
 
 - Captura resumen de la Auditoría fsck sobre /backup
-![Captura resumen de la Auditoría fsck sobre /backup]()
+![Captura resumen de la Auditoría fsck sobre /backup](../img/resumen_csv_backup.png)
+
+- Captura resumen de la Auditoría fsck sobre /backup en HDFS (9870)
+![Captura resumen de la Auditoría fsck sobre /backup en HDFS (9870)](../img/resumen_backup_9870.png)
 
 ## 3) Backup + validación
 - Captura Inventario origen vs destino
-![Captura Inventario origen vs destino]()
+![Captura Inventario origen vs destino](../img/inventario_origen_vs_destino.png)
 
 -  Captura Evidencias de consistencia (tamaños/rutas) en HDFS (9870)
-![Captura Evidencias de consistencia (tamaños/rutas) en HDFS (9870)]()
+- /data:
+![Captura 1 Evidencias de consistencia (tamaños/rutas) en HDFS (9870): logs en /data](../img/data_9870_logs.png)
+![Captura 2 Evidencias de consistencia (tamaños/rutas) en HDFS (9870): IoT en /data](../img/data_9870_iot.png)
+
+- /backup
+![Captura 2 Evidencias de consistencia (tamaños/rutas) en HDFS (9870): logs en /backup](../img/backup_9870_logs.png)
+![Captura 3 Evidencias de consistencia (tamaños/rutas) en HDFS (9870): IoT en /backup](../img/backup_9870_iot.png)
 
 ## 4) Incidente + recuperación
 ## 4.1) Incidente
@@ -43,13 +57,25 @@ Para el incidente lo que hice, ya que tenía 4 datanodes levantados y en ese mom
 De este modo forcé que el sistema de archivos perdiese o no pudiese repartir parte de la información de dichos archivos.
 
 Esto se ve reflejado ya que al realizar una auditoría fsck, después de 10 minutos de espera, sobre ese directorio se ven cambios porque el sistema detectó que algunos bloques no tenian el número de copias esperado (Missing replicas):
-![Captura Auditoría fsck tras accidente]()
+
+- Capturas de la Auditoría fsck sobre /data después del incidente
+![Captura 1 de la Auditoría fsck sobre /data después del incidente](../img/fsck_data_accidente_1.png)
+![Captura 2 de la Auditoría fsck sobre /data después del incidente](../img/fsck_data_accidente_2.png)
+
+- Captura resumen de la Auditoría fsck sobre /data después del incidente
+![Captura resumen de la Auditoría fsck sobre /data después del incidente](../img/resumen_csv_data_accidente.png)
 
 ## 4.2) Recuperación
 Para la recuperación, una vez finalizado de forma exitosa el accidente simulado, procedí a levantar los mismos 2 nodos que apagué durante la ingesta. Tras esto esperé un total de 10 minutos, para que le de tiempo al sistema HDFS a auto-recuperarse, y así, poder ver esa recuperación reflejada en una auditoria que hago posteriormenete del directorio /data.
 
 Tras realizar la recuperación y esperar la actualización del reporte fsck, se pudo observar que el sistema ya habia solucionado el problema de las réplicas perdidas:
-![Captura Auditoría fsck tras recuperación]()
+
+- Capturas de la Auditoría fsck sobre /data después de la recuperación
+![Captura 1 de la Auditoría fsck sobre /data después de la recuperación](../img/fsck_data_recuperacion_1.png)
+![Captura 2 de la Auditoría fsck sobre /data después de la recuperación](../img/fsck_data_recuperacion_2.png)
+
+- Captura resumen de la Auditoría fsck sobre /data después de la recuperación
+![Captura resumen de la Auditoría fsck sobre /data después de la recuperación](../img/resumen_csv_data_recuperacion.png)
 
 
 ## 5) Métricas
