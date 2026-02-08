@@ -81,6 +81,39 @@ Por ello, se tomó la decisión técnica de no utilizar la librería estándar `
 
 ---
 
+## Configuración HDFS
+
+**Ubicación de los ficheros de configuración**
+
+Las políticas de configuración del clúster se configuran mediante archivos XML aislados dentro de los contenedores Docker.
+
+Debido a que utilizamos una imagen personalizada (`profesorbigdata`), la configuración no está en la ruta estándar de Linux (`/etc/hadoop/conf/`), sino en un directorio de instalación propio:
+
+- **Directorio:**`/opt/bd/hadoop-3.3.6/etc/hadoop/`
+- **Verificación :** Puedes comprobar la existencia de estos ficheros ejecutando el siguiente comando desde tu terminal:
+```bash
+docker exec namenode ls -l /opt/bd/hadoop-3.3.6/etc/hadoop/
+```
+
+**Archivo Clave y su Función**
+Existen varios archivos de configuración clave, pero nos vamos a centrar en el archivo con más impotancia en relación con la integridad, el archivo `hdfs-site.xml`:
+
+| Archivo | Propósito en el Proyecto | Parámetros Críticos que define |
+| :--- | :--- | :--- |
+| **`hdfs-site.xml`** | **Reglas de Almacenamiento.** Define cómo interactúa el NameNode con los datos físicos. Es el archivo donde configuramos la integridad. | • **`dfs.replication`**: Define cuántas copias de cada bloque se guardan (Configurado a **3** por defecto).<br>• **`dfs.blocksize`**: Define el tamaño del "chunk" de datos (Configurado a **64MB** por defecto).<br>• **`dfs.namenode.name.dir`**: Ruta interna donde el NameNode guarda los metadatos. |
+
+Para extraerlo desde el host y verificar la configuración actual, se utiliza el comando:
+
+```bash
+docker cp namenode:/opt/bd/hadoop-3.3.6/etc/hadoop/hdfs-site.xml {Ruta_local}
+```
+> Nota:  
+> Para encontrar la ruta donde estaba alojado el archivo `hdfs-site.xml` he empleado el siguiente comando:
+> ```bash
+> docker exec namenode find / -name hdfs-site.xml
+> ```
+
+**Valores Configurados y Justificación (Integridad vs. Coste)**
 
 
 ---
