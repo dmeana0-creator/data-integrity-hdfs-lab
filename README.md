@@ -20,7 +20,7 @@ El clúster está orquestado mediante Docker Compose (v3.8) y simula un entorno 
 | **Gestión (Mgmt)** | `resourcemanager` | **Orquestador.** Gestiona la asignación de recursos computacionales (CPU/RAM) en el clúster YARN. | `8088` (YARN UI) |
 | **Trabajadores (Slaves)** | `dnnm` (x4) | **Almacenamiento y Cómputo.** 4 instancias escaladas (`clustera-dnnm-1` a `4`) que ejecutan los daemons **DataNode** y **NodeManager**. | Internos |
 
-### 2. Pipeline de Datos: Ciclo de Vida y Resiliencia (End-to-End)
+### 2. Pipeline de Datos: Ciclo de Vida y Resiliencia
 Se ha implementado un flujo de trabajo que unifica la ingesta masiva con protocolos estrictos de auditoría y recuperación. Cada fase es ejecutada por scripts especializados en Python.
 
 **FASE A: Aprovisionamiento e Ingesta**
@@ -74,17 +74,40 @@ Por ello, se tomó la decisión técnica de no utilizar la librería estándar `
 ---
 
 ## Estructura del repositorio
-- `docker/clusterA/`: docker-compose del aula (Cluster A)
-- `scripts/`: pipeline (generación → ingesta → auditoría → backup → auditoria → incidente → recuperación) y script de ejecución del pipeline.
-- `notebooks/`: análisis en Jupyter (tabla de auditorías y métricas)
-- `docs/`: documentación (enunciado, rúbrica, pistas, entrega, evidencias)
-- `img/` : capturas de pantalla para incluir en la documentación.
+
+```text
+data-integrity-hdfs-lab/
+├── docker/
+│   └── clusterA/
+│       ├── notebooks/                        # Directorio montado en NameNode (/media/notebooks)
+│       │   └── 02_auditoria_integridad.ipynb # Notebook de análisis de auditorías y métricas en Jupyter dentro del Namenode
+│       └── docker-compose.yml                # Definición de infraestructura (NameNode + YARN + DataNodes)
+├── docs/                                     # Documentación (Enunciado, rúbrica, evidencias)
+├── env/                                      # Entorno virtual de Python (venv)
+├── img/                                      # Capturas de pantalla para la documentación
+├── notebooks/                                # Notebook de análisis de auditorías y métricas en Jupyter
+├── scripts/                                  # Pipeline de Automatización (Python)
+│   ├── 00_bootstrap.py                       # Configuración inicial de directorios HDFS
+│   ├── 10_generate_data.py                   # Generación de dataset sintético (Logs/IoT)
+│   ├── 20_ingest_hdfs.py                     # Ingesta de datos a HDFS
+│   ├── 30_fsck_data_audit.py                 # Auditoría de salud en capa Raw (/data)
+│   ├── 40_backup_copy.py                     # Proceso de Backup/Replicación (/backup)
+│   ├── 50_inventory_compare.py               # Validación de integridad (Inventario)
+│   ├── 60_fsck_backup_audit.py               # Auditoría de salud en capa Backup (/backup)
+│   ├── 70_incident_simulation.py             # Simulación de caída de nodos e impacto de la caída
+│   ├── 80_recovery_restore.py                # Recuperación y comprobación de Self-Healing
+│   └── 90_run_all.py                         # Orquestador para ejecutar todo el flujo
+├── .gitignore                                # Exclusiones de Git
+├── README.md                                 # Documentación principal del proyecto (Este archivo)
+└── requirements.txt                          # Dependencias y librerías necesarias
+
+```
 
 ---
 
 ## Configuración HDFS
 
-**Ubicación de los ficheros de configuración**
+### Ubicación de los ficheros de configuración
 
 Las políticas de configuración del clúster se configuran mediante archivos XML aislados dentro de los contenedores Docker.
 
@@ -96,7 +119,7 @@ Debido a que utilizamos una imagen personalizada (`profesorbigdata`), la configu
 docker exec namenode ls -l /opt/bd/hadoop-3.3.6/etc/hadoop/
 ```
 
-**Archivo Clave y su Función**
+### Archivo Clave y su Función
 Existen varios archivos de configuración clave, pero nos vamos a centrar en el archivo con más impotancia en relación con la integridad, el archivo `hdfs-site.xml`:
 
 | Archivo | Propósito en el Proyecto | Parámetros Críticos que define |
@@ -114,8 +137,33 @@ docker cp namenode:/opt/bd/hadoop-3.3.6/etc/hadoop/hdfs-site.xml {Ruta_local}
 > docker exec namenode find / -name hdfs-site.xml
 > ```
 
-**Valores Configurados y Justificación (Integridad vs. Coste)**
+### Valores Configurados y Justificación (Integridad vs. Coste)
 
+Los parámetros de configuración del clúster se encuentran definidos en el archivo `hdfs-site.xml`. Basado en las evidencias del entorno desplegado, los valores operativos son:
+
+| Parámetro | Valor Configurado | Descripción |
+| :--- | :--- | :--- |
+| **`dfs.blocksize`** | `64 MB` | Tamaño del bloque lógico en el que HDFS divide los archivos. |
+| **`dfs.replication`** | `3` | Número de copias que se mantienen de cada bloque en distintos nodos. |
+
+**Justificación Técnica**
+
+Para este entorno de laboratorio, se ha reducido el tamaño de bloque a 64 MB (frente al default de 128 MB) para optimizar el paralelismo. Dado que nuestros archivos de ingesta rondan los 250 MB, un bloque de 128 MB apenas generaría 2 bloques, infrautilizando el clúster. Con 64 MB, obtenemos ~4 bloques por archivo, permitiendo que los 4 DataNodes trabajen simultáneamente en la lectura/escritura, mejorando la distribución de carga sin saturar la memoria del NameNode. Respecto a la replicación, se mantiene el Factor 3 (RF=3) como estándar de integridad. Esto garantiza que, incluso si fallan dos nodos, el dato sigue disponible, ofreciendo la redundancia necesaria para un entorno que simula producción crítica sin incurrir en el coste excesivo de la replicación total (RF=4).
+
+### Niveles de Integridad: CRC vs. Hashing End-to-End
+Es fundamental distinguir entre la integridad que ofrece la infraestructura (HDFS) y la que requiere el negocio (Aplicación).
+
+1. **¿Por qué el CRC (por bloque) es habitual en HDFS?** HDFS implementa nativamente **CRC-32C** (Cyclic Redundancy Check) por cada 512 bytes de datos. Su uso es el estándar en sistemas distribuidos por dos razones clave:
+
+    - **Eficiencia Computacional**: El cálculo de CRC es extremadamente rápido y ligero para la CPU. Esto permite a HDFS verificar terabytes de datos en tiempo real mientras se leen o escriben sin ralentizar el sistema.
+
+    - **Detección de "Bit Rot"**: Su función principal es detectar la degradación física del disco duro o errores de ruido en la transmisión de red. Si un bit cambia de 0 a 1 por un fallo de hardware, el CRC lo detecta y HDFS descarta ese bloque corrupto automáticamente.
+
+2. **¿Qué aporta SHA/MD5 a nivel de aplicación?** Aunque el CRC garantiza que el bloque se lee igual que se escribió, no valida la lógica del archivo. Aquí es donde entran nuestros scripts con algoritmos de hash criptográfico (como SHA-256 o MD5) sobre el archivo completo:
+
+    - **Integridad Lógica (End-to-End):** El CRC no detecta si un proceso de ingesta se cortó a la mitad o si un archivo fue truncado por un error de software (el disco guardó bien "medio archivo", por lo que el CRC es válido, pero el dato es inútil).
+
+    - **Autenticidad:** El hash actúa como una **huella digital única**. Nos asegura matemáticamente que el archivo que reside en `/backup` es idéntico al original generado, protegiéndonos contra errores humanos, manipulaciones o fallos lógicos que el sistema de archivos no puede ver.
 
 ---
 
@@ -171,7 +219,7 @@ docker compose up -d --scale dnnm=4
 
 ### Ejecución del Pipeline
 
->**¡IMPORTANTE!**: Evita ejecutar el los scripts cerca de las 23:00 - 00:00 de la noche, ya que todos los scripts deben de >ejecutarse en la misma fecha. Y asegurate de clonar el repositorio en una carpeta de trabajo a ser posible específica para >este proyecto, ya que se crean carpetas fuera de la carpeta raiz del repositorio `data-integrity-hdfs-lab`.
+>**¡IMPORTANTE!**: Evita ejecutar el los scripts cerca de las 23:00 - 00:00 de la noche, ya que todos los scripts deben de ejecutarse en la misma fecha. Y asegurate de clonar el repositorio en una carpeta de trabajo a ser posible específica para >este proyecto, ya que se crean carpetas fuera de la carpeta raiz del repositorio `data-integrity-hdfs-lab`.
 
 Tenemos dos opciones para ejecutar la lógica del proyecto:
 - **Opción A: Ejecución Maestra (Recomendada)** Ejecutamos el orquestador que lanza todos los scripts en el orden correcto y gestiona los tiempos de espera.
