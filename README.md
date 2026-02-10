@@ -3,8 +3,38 @@
 
 Este repositorio contiene la implementación de un pipeline de ingesta y preservación digital para la gestión, auditoría, simulación de incidentes y recuperación de datos sensibles (Logs y Telemetría IoT) en un ecosistema Hadoop dockerizado.
 
-El objetivo principal es garantizar la Integridad del Dato (Data Integrity) y validar la resiliencia de la infraestructura frente a fallos críticos, demostrando capacidades de Self-Healing (auto-recuperación).
+El objetivo principal es garantizar la integridad de los datos y validar la resiliencia de la infraestructura frente a fallos críticos, demostrando capacidades de Auto-recuperación).
 
+---
+## Estructura del repositorio
+
+```text
+data-integrity-hdfs-lab/
+├── docker/
+│   └── clusterA/
+│       ├── notebooks/                        # Directorio montado en NameNode (/media/notebooks)
+│       │   └── 02_auditoria_integridad.ipynb # Notebook de análisis de auditorías y métricas en Jupyter dentro del Namenode
+│       └── docker-compose.yml                # Definición de infraestructura (NameNode + YARN + DataNodes)
+├── docs/                                     # Documentación (Enunciado, rúbrica, evidencias)
+├── env/                                      # Entorno virtual de Python (venv)
+├── img/                                      # Capturas de pantalla para la documentación
+├── notebooks/                                # Notebook de análisis de auditorías y métricas en Jupyter
+├── scripts/                                  # Pipeline de Automatización (Python)
+│   ├── 00_bootstrap.py                       # Configuración inicial de directorios HDFS
+│   ├── 10_generate_data.py                   # Generación de dataset sintético (Logs/IoT)
+│   ├── 20_ingest_hdfs.py                     # Ingesta de datos a HDFS
+│   ├── 30_fsck_data_audit.py                 # Auditoría de salud en capa Raw (/data)
+│   ├── 40_backup_copy.py                     # Proceso de Backup/Replicación (/backup)
+│   ├── 50_inventory_compare.py               # Validación de integridad (Inventario)
+│   ├── 60_fsck_backup_audit.py               # Auditoría de salud en capa Backup (/backup)
+│   ├── 70_incident_simulation.py             # Simulación de caída de nodos e impacto de la caída
+│   ├── 80_recovery_restore.py                # Recuperación y comprobación de Self-Healing
+│   └── 90_run_all.py                         # Orquestador para ejecutar todo el flujo
+├── .gitignore                                # Exclusiones de Git
+├── README.md                                 # Documentación principal del proyecto (Este archivo)
+└── requirements.txt                          # Dependencias y librerías necesarias
+
+```
 ---
 
 ## Arquitectura y Decisiones Técnicas
@@ -63,45 +93,6 @@ Por ello, se tomó la decisión técnica de no utilizar la librería estándar `
 - **El Problema:** Al usar la librería `hdfs` desde el host hacia el clúster Dockerizado, la conexión inicial con el NameNode funciona, pero la transmisión de datos falla. Esto ocurre porque el NameNode redirige al cliente a la IP/Hostname interno del contenedor (ej: `ccdbbce22765`), el cual no es resoluble desde el host sin una configuración de DNS compleja o manipulación del archivo `hosts`. Además, mapear los puertos de 4 DataNodes diferentes al mismo puerto local (`9864`) es inviable.
 
 - **La Solución:** Se implementó una lógica de "puente" o bridge. Los scripts de Python mueven los datos locales al contenedor del NameNode (`docker cp`) y ejecutan las órdenes HDFS desde dentro del clúster (`docker exec`). Esto garantiza una comunicación interna fluida y elimina los errores de resolución de nombres (`NameResolutionError`).
-
----
-
-## Servicios y UIs
-- NameNode UI: http://localhost:9870
-- ResourceManager UI: http://localhost:8088
-- Jupyter (NameNode): http://localhost:8889
-
----
-
-## Estructura del repositorio
-
-```text
-data-integrity-hdfs-lab/
-├── docker/
-│   └── clusterA/
-│       ├── notebooks/                        # Directorio montado en NameNode (/media/notebooks)
-│       │   └── 02_auditoria_integridad.ipynb # Notebook de análisis de auditorías y métricas en Jupyter dentro del Namenode
-│       └── docker-compose.yml                # Definición de infraestructura (NameNode + YARN + DataNodes)
-├── docs/                                     # Documentación (Enunciado, rúbrica, evidencias)
-├── env/                                      # Entorno virtual de Python (venv)
-├── img/                                      # Capturas de pantalla para la documentación
-├── notebooks/                                # Notebook de análisis de auditorías y métricas en Jupyter
-├── scripts/                                  # Pipeline de Automatización (Python)
-│   ├── 00_bootstrap.py                       # Configuración inicial de directorios HDFS
-│   ├── 10_generate_data.py                   # Generación de dataset sintético (Logs/IoT)
-│   ├── 20_ingest_hdfs.py                     # Ingesta de datos a HDFS
-│   ├── 30_fsck_data_audit.py                 # Auditoría de salud en capa Raw (/data)
-│   ├── 40_backup_copy.py                     # Proceso de Backup/Replicación (/backup)
-│   ├── 50_inventory_compare.py               # Validación de integridad (Inventario)
-│   ├── 60_fsck_backup_audit.py               # Auditoría de salud en capa Backup (/backup)
-│   ├── 70_incident_simulation.py             # Simulación de caída de nodos e impacto de la caída
-│   ├── 80_recovery_restore.py                # Recuperación y comprobación de Self-Healing
-│   └── 90_run_all.py                         # Orquestador para ejecutar todo el flujo
-├── .gitignore                                # Exclusiones de Git
-├── README.md                                 # Documentación principal del proyecto (Este archivo)
-└── requirements.txt                          # Dependencias y librerías necesarias
-
-```
 
 ---
 
@@ -167,6 +158,13 @@ Es fundamental distinguir entre la integridad que ofrece la infraestructura (HDF
 
 ---
 
+## Servicios y UIs
+- NameNode UI: http://localhost:9870
+- ResourceManager UI: http://localhost:8088
+- Jupyter (NameNode): http://localhost:8889
+
+---
+
 ## Guía de reproducción
 Esta sección detalla el procedimiento paso a paso para desplegar el entorno y ejecutar el pipeline de datos de forma controlada. Si prefieres una ejecución automática y desatendida, consulta la sección Quickstart más abajo.
 
@@ -182,16 +180,32 @@ Asegúrate de tener instalado y configurado lo siguiente en tu máquina local:
 
 El proyecto utiliza un entorno virtual para aislar las dependencias y la herramienta `uv` para una instalación rápida de paquetes.
 
-1. **Creamos el entorno virtual:**
+1. **Creamos la carpeta donde clonaremos el repo**
+
+2. **Clonamos el repo en nuestra carpeta de trabajo**
+```bash
+# Abrimos la carpeta donde vamos a querer almacenar este proyecto con Visual Studio
+# Abrimos una terminal posicionandonos en dicha carpeta y ejecutamos lo siguiente
+git clone https://github.com/dmeana0-creator/data-integrity-hdfs-lab.git
+```
+
+3. **Creamos el entorno virtual:**
+- Para Windows
 ```bash
 # En la raíz del proyecto (data-integrity-hdfs-lab)
 python -m venv env
 ```
-2. **Activamos el entorno:**
+- Para Linux
+```bash
+# En la raíz del proyecto (data-integrity-hdfs-lab)
+python3 -m venv env
+```
+
+4. **Activamos el entorno:**
 - Windows (PowerShell): `.\env\Scripts\activate`
 - Linux/Mac: `source env/bin/activate`
 
-3. **Instalamos dependencias:**
+5. **Instalamos dependencias:**
 ```bash
 pip install uv
 uv pip install -r requirements.txt
@@ -256,7 +270,6 @@ python 90_run_all.py
 
 > **¡IMPORTANTE!**: Evita ejecutar el quickstart cerca de las 23:00 - 00:00 de la noche, ya que todos los scripts deben de ejecutarse en la misma fecha. Y asegurate de clonar el repositorio en una carpeta de trabajo a ser posible específica para este
 > proyecto, ya que se crean carpetas fuera de la carpeta raíz del repositorio `data-integrity-hdfs-lab`.
-
 
 ### Versión Linux
 ```bash
