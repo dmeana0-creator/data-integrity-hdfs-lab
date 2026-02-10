@@ -12,23 +12,23 @@ El objetivo principal es garantizar la Integridad del Dato (Data Integrity) y va
 El diseño del sistema se ha concebido para garantizar la Integridad del Dato (Data Integrity) y la resiliencia operativa. La arquitectura se divide en tres capas lógicas: Infraestructura, Pipeline de Datos y Estrategia de Ingesta.
 
 ### 1. Arquitectura de Infraestructura (Microservicios)
-El clúster está orquestado mediante Docker Compose (v3.8) y simula un entorno Hadoop 3.x (YARN + HDFS) utilizando una red interna en modo Bridge.
+El clúster se despliega mediante Docker Compose, simulando un entorno Hadoop 3.x distribuido. La arquitectura separa claramente las funciones de gestión (Maestros) de las de trabajo (Workers).
 
-| Rol | Servicio (Container) | Descripción Técnica | Puertos Expuestos |
+| Servicio / Contenedor | Rol (Función) | Descripción | Puertos (Accesos) |
 | :--- | :--- | :--- | :--- |
-| **Maestro (Master)** | `namenode` | **Cerebro del sistema.** Gestiona el Namespace (metadatos) y la tabla de bloques. Aloja el servidor de **Jupyter Notebook** para análisis local. Persiste el trabajo mediante volúmenes en `./notebooks`. | `9870` (HDFS UI)<br>`8889` (Jupyter) |
-| **Gestión (Mgmt)** | `resourcemanager` | **Orquestador.** Gestiona la asignación de recursos computacionales (CPU/RAM) en el clúster YARN. | `8088` (YARN UI) |
-| **Trabajadores (Slaves)** | `dnnm` (x4) | **Almacenamiento y Cómputo.** 4 instancias escaladas (`clustera-dnnm-1` a `4`) que ejecutan los daemons **DataNode** y **NodeManager**. | Internos |
+| **`namenode`** | **Maestro de HDFS** | Gestiona el índice de archivos (metadatos) pero **no almacena datos** de usuario. Actúa como servidor principal para **Jupyter Notebook**, permitiendo persistir el trabajo en la carpeta `./notebooks`. | `9870` (HDFS WebUI)<br>`8889` (Jupyter Lab) |
+| **`resourcemanager`** | **Maestro de YARN** | Administra los recursos del clúster (CPU y RAM). Su función es decidir qué nodo está libre para ejecutar las tareas que enviamos. | `8088` (YARN WebUI) |
+| **`dnnm`** (x4) | **Nodos de Trabajo**<br>*(Storage + Compute)* | Son 4 contenedores escalados (`clustera-dnnm-1` a `4`) que realizan el trabajo pesado: **almacenan** los bloques de datos físicos y **ejecutan** el procesamiento. | *Internos* |
 
 ### 2. Pipeline de Datos: Ciclo de Vida y Resiliencia
-Se ha implementado un flujo de trabajo que unifica la ingesta masiva con protocolos estrictos de auditoría y recuperación. Cada fase es ejecutada por scripts especializados en Python.
+Se ha implementado un flujo de trabajo que unifica la ingesta con protocolos estrictos de auditoría y recuperación. Cada fase es ejecutada por scripts especializados en Python.
 
 **FASE A: Aprovisionamiento e Ingesta**
-- **Inicialización (`00_bootstrap.py`):** Configura el "esqueleto" del Data Lake, creando las estructuras de directorios (`/data`, `/audit`, `/backup`) y definiendo permisos en HDFS antes de cualquier operación.
+- **Inicialización (`00_bootstrap.py`):** Configura el "esqueleto", creando las estructuras de directorios (`/data`, `/audit`, `/backup`).
 
-- **Generación Sintética (`10_generate_data.py`):** Simula una fuente de datos de alta velocidad utilizando Polars y Faker. Los datos se generan en una zona de Staging Local (`data_local`) en formatos estándar: JSONL (para IoT) y LOG (para Logs), optimizando la memoria mediante escritura en lotes (batches).
+- **Generación Sintética (`10_generate_data.py`):** Simula una fuente de datos de alta velocidad utilizando Polars y Faker. Los datos se generan en una carpeta local (`data_local`) en formatos estándar: JSONL (para IoT) y LOG (para Logs), optimizando la memoria mediante escritura en lotes (batches).
 
-- **Ingesta al Data Lake (`20_ingest_hdfs.py`):** Transfiere los datos desde Staging a la capa Raw de HDFS. Implementa un particionado estilo Hive (`/data/.../dt=YYYY-MM-DD/`) para optimizar el almacenamiento y el rendimiento de lectura futuro.
+- **Ingesta al Data Lake (`20_ingest_hdfs.py`):** Transfiere los datos desde local a la carpeta `/raw` de HDFS. Implementa un particionado estilo Hive (`/data/.../dt=YYYY-MM-DD/`) para optimizar el almacenamiento y el rendimiento de lectura futuro.
 
 
 **FASE B: Gobierno y Aseguramiento**
@@ -40,17 +40,17 @@ Sistema de "Defensa en Profundidad" para garantizar la durabilidad del dato una 
 **Nivel 1:** Replicación nativa de HDFS (Factor: 3).
 **Nivel 2:** Script que realiza una copia de seguridad (Backup) de los datos hacia el directorio `/backup`, aislando los datos de producción.
 
-- **Validación de Integridad (`50_inventory_compare.py`)**: Realiza una verificación cruzada entre `/data` (Origen) y `/backup` (Destino). Compara byte a byte el tamaño de los archivos para certificar matemáticamente que la copia es idéntica al original.
+- **Validación de Integridad (`50_inventory_compare.py`)**: Realiza una verificación cruzada entre `/data` (Origen) y `/backup` (Destino). Compara byte a byte el tamaño de los archivos para certificar matemáticamente que la copia es idéntica a la original.
 
 - **Auditoría de Respaldo (`60_fsck_backup_audit.py`):** Verificación final de salud sobre el directorio `/backup` para asegurar la integridad del repositorio de recuperación.
 
 **FASE C: Ingeniería del Caos y Recuperación**
 
-Validación empírica de la arquitectura mediante pruebas de estrés controladas.
+Validación de la arquitectura mediante pruebas de estrés controladas.
 
-- **Simulación de Incidente (`70_incident_simulation.py`):** Detiene intencionalmente contenedores DataNode críticos (`clustera-dnnm-1`, `clustera-dnnm-2`) durante operaciones de escritura activas para probar la tolerancia a fallos del sistema y ver el impacto del accidente en el sistema.
+- **Simulación de Incidente (`70_incident_simulation.py`):** Detiene intencionalmente contenedores DataNode críticos (`clustera-dnnm-1`, `clustera-dnnm-2`) durante la operación de ingesta de datos para probar la tolerancia a fallos del sistema y ver el impacto del accidente en el sistema.
 
-- **Auto-Curación y Restauración (`80_recovery_restore.py`):** Reactiva la infraestructura y monitorea el proceso de Self-Healing de Hadoop (re-replicación de bloques y balanceo) hasta que el clúster reporta nuevamente un estado completamente sano.
+- **Auto-Curación y Restauración (`80_recovery_restore.py`):** Reactiva los DataNodes y comprueba la Auto-Curación del sistema que pasará nuevamente a un estado completamente sano.
 
 ### 3. Justificación Técnica: Estrategia de Ingesta "Docker Bridge"
 
@@ -60,7 +60,7 @@ Por ello, se tomó la decisión técnica de no utilizar la librería estándar `
 
 **Justificación del cambio**
 
-- **El Problema:** Al usar la librería `hdfs` desde el host (Windows/Linux) hacia el clúster Dockerizado, la conexión inicial con el NameNode funciona, pero la transmisión de datos falla. Esto ocurre porque el NameNode redirige al cliente a la IP/Hostname interno del contenedor (ej: `ccdbbce22765`), el cual no es resoluble desde el host sin una configuración de DNS compleja o manipulación del archivo `hosts`. Además, mapear los puertos de 4 DataNodes diferentes al mismo puerto local (`9864`) es inviable.
+- **El Problema:** Al usar la librería `hdfs` desde el host hacia el clúster Dockerizado, la conexión inicial con el NameNode funciona, pero la transmisión de datos falla. Esto ocurre porque el NameNode redirige al cliente a la IP/Hostname interno del contenedor (ej: `ccdbbce22765`), el cual no es resoluble desde el host sin una configuración de DNS compleja o manipulación del archivo `hosts`. Además, mapear los puertos de 4 DataNodes diferentes al mismo puerto local (`9864`) es inviable.
 
 - **La Solución:** Se implementó una lógica de "puente" o bridge. Los scripts de Python mueven los datos locales al contenedor del NameNode (`docker cp`) y ejecutan las órdenes HDFS desde dentro del clúster (`docker exec`). Esto garantiza una comunicación interna fluida y elimina los errores de resolución de nombres (`NameResolutionError`).
 
@@ -175,9 +175,8 @@ Esta sección detalla el procedimiento paso a paso para desplegar el entorno y e
 Asegúrate de tener instalado y configurado lo siguiente en tu máquina local:
 
 - Docker Desktop
-- Python 3.9+
+- Python 3.11.9
 - Git
-- **Recursos:** Se recomienda asignar al menos 4GB de RAM a Docker Desktop para soportar los 4 nodos y el NameNode simultáneamente.
 
 ### Preparación del Entorno Python
 
@@ -239,8 +238,8 @@ python 90_run_all.py
 2. `python 10_generate_data.py` (Genera logs y datos IoT en local).
 3. `python 20_ingest_hdfs.py` (Sube los datos al clúster).
 4. `python 30_fsck_data_audit.py` (Verifica la salud de los datos originales).
-5. `python 40_backup_copy.py` (Realiza el backup a /backup).
-6. `python 50_inventory_compare.py` (Valida integridad byte a byte).
+5. `python 40_backup_copy.py` (Realiza la copia de los archivos en /backup).
+6. `python 50_inventory_compare.py` (Valida integridad entre /data y /backup byte a byte).
 7. `python 60_fsck_backup_audit.py` (Audita el backup).
 8. `python 70_incident_simulation.py` (Simula la caída de nodos y muestra su impacto).
 9. `python 80_recovery_restore.py` (Restaura el servicio y verifica el self-healing).

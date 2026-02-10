@@ -17,6 +17,7 @@ services:
         - "8889:8889" #Jupyter Notebook
     volumes: 
       - ./notebooks:/media/notebooks #../notebooks Es el directorio local que es compartido con el contenedor
+      - ../../img:/media/notebooks/img # carpeta donde se guardan las capturas para poder visualizarlas en el cuaderno Jupyter
     networks:
         - hadoop-net
 
