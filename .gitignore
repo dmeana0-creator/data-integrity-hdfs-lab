@@ -1,14 +1,16 @@
-docker/clusterA/notebooks/
-
-.ipynb_checkpoints
-**/.ipynb_checkpoints
-
-__pycache__/
-*.pyc
-
-
+# --- Carpetas Base ---
 data_local/
-
-
 env/
 .env
+
+# --- Python y Jupyter ---
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# --- Gestión de Auditorías y Notebooks ---
+*raw_audits*/
+*resumen_audit*/
+
+!**/PARSEO_INFORME.ipynb

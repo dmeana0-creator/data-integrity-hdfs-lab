@@ -75,9 +75,10 @@ Por ello, se tomó la decisión técnica de no utilizar la librería estándar `
 
 ## Estructura del repositorio
 - `docker/clusterA/`: docker-compose del aula (Cluster A)
-- `scripts/`: pipeline (generación → ingesta → auditoría → backup → incidente → recuperación)
+- `scripts/`: pipeline (generación → ingesta → auditoría → backup → auditoria → incidente → recuperación) y script de ejecución del pipeline.
 - `notebooks/`: análisis en Jupyter (tabla de auditorías y métricas)
 - `docs/`: documentación (enunciado, rúbrica, pistas, entrega, evidencias)
+- `img/` : capturas de pantalla para incluir en la documentación.
 
 ---
 
@@ -118,4 +119,103 @@ docker cp namenode:/opt/bd/hadoop-3.3.6/etc/hadoop/hdfs-site.xml {Ruta_local}
 
 ---
 
+## Guía de reproducción
+Esta sección detalla el procedimiento paso a paso para desplegar el entorno y ejecutar el pipeline de datos de forma controlada. Si prefieres una ejecución automática y desatendida, consulta la sección Quickstart más abajo.
 
+### Requisitos Previo
+
+Asegúrate de tener instalado y configurado lo siguiente en tu máquina local:
+
+- Docker Desktop
+- Python 3.9+
+- Git
+- **Recursos:** Se recomienda asignar al menos 4GB de RAM a Docker Desktop para soportar los 4 nodos y el NameNode simultáneamente.
+
+### Preparación del Entorno Python
+
+El proyecto utiliza un entorno virtual para aislar las dependencias y la herramienta `uv` para una instalación rápida de paquetes.
+
+1. **Creamos el entorno virtual:**
+```bash
+# En la raíz del proyecto (data-integrity-hdfs-lab)
+python -m venv env
+```
+2. **Activamos el entorno:**
+- Windows (PowerShell): `.\env\Scripts\activate`
+- Linux/Mac: `source env/bin/activate`
+
+3. **Instalamos dependencias:**
+```bash
+pip install uv
+uv pip install -r requirements.txt
+```
+
+### Despliegue de la Infraestructura (Hadoop Cluster)
+
+Levantamos el clúster HDFS escalando los nodos de datos (DataNodes) a 4 instancias
+
+1. **Navegamos al directorio de orquestación:**
+```bash
+cd docker/clusterA
+```
+
+2. **Limpiamos por si hay contenedores anteriores desplegados:**
+```bash
+docker compose down
+```
+
+3. **Iniciamos los contenedores**
+```bash
+docker compose up -d --scale dnnm=4
+```
+
+### Ejecución del Pipeline
+
+>**¡IMPORTANTE!**: Evita ejecutar el los scripts cerca de las 23:00 - 00:00 de la noche, ya que todos los scripts deben de >ejecutarse en la misma fecha. Y asegurate de clonar el repositorio en una carpeta de trabajo a ser posible específica para >este proyecto, ya que se crean carpetas fuera de la carpeta raiz del repositorio `data-integrity-hdfs-lab`.
+
+Tenemos dos opciones para ejecutar la lógica del proyecto:
+- **Opción A: Ejecución Maestra (Recomendada)** Ejecutamos el orquestador que lanza todos los scripts en el orden correcto y gestiona los tiempos de espera.
+```bash
+cd ../../scripts
+python 90_run_all.py
+```
+> Nota: en el caso de ejecutarlos en Linux el comando sería así:
+> ```bash
+>cd ../../scripts
+>python3 90_run_all.py
+>```
+
+- **Opción B: Ejecución Manual Paso a Paso** Si deseamos depurar o ver el resultado de cada fase individualmente, ejecutamos los scripts en este orden desde la carpeta `scripts/` :
+
+1. `python 00_bootstrap.py` (Prepara directorios HDFS).
+2. `python 10_generate_data.py` (Genera logs y datos IoT en local).
+3. `python 20_ingest_hdfs.py` (Sube los datos al clúster).
+4. `python 30_fsck_data_audit.py` (Verifica la salud de los datos originales).
+5. `python 40_backup_copy.py` (Realiza el backup a /backup).
+6. `python 50_inventory_compare.py` (Valida integridad byte a byte).
+7. `python 60_fsck_backup_audit.py` (Audita el backup).
+8. `python 70_incident_simulation.py` (Simula la caída de nodos y muestra su impacto).
+9. `python 80_recovery_restore.py` (Restaura el servicio y verifica el self-healing).
+
+> Nota: en el caso de ejecutarlos en Linux el comando sería así:
+> ```bash
+>cd ../../scripts
+>python3 {nombre_script}.py
+>```
+
+---
+
+## Quickstart (para corrección)
+
+> **¡IMPORTANTE!**: Evita ejecutar el quickstart cerca de las 23:00 - 00:00 de la noche, ya que todos los scripts deben de ejecutarse en la misma fecha. Y asegurate de clonar el repositorio en una carpeta de trabajo a ser posible específica para este
+> proyecto, ya que se crean carpetas fuera de la carpeta raíz del repositorio `data-integrity-hdfs-lab`.
+
+
+### Versión Linux
+```bash
+cd data-integrity-hdfs-lab && python3 -m venv env && source env/bin/activate && pip install uv && uv pip install -r requirements.txt && cd docker/clusterA && docker compose down && docker compose up -d --scale dnnm=4 && cd ../../scripts && python ./90_run_all.py
+```
+### Versión Windows
+```bash
+cd data-integrity-hdfs-lab ; python -m venv env ; .\env\Scripts\activate ; pip install uv ; uv pip install -r requirements.txt ; cd docker/clusterA ; docker compose down ; docker compose up -d --scale dnnm=4 ; cd ../../scripts ; python ./90_run_all.py
+```

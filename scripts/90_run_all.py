@@ -19,6 +19,8 @@ SCRIPTS = [
 ]
 
 def main():
+    print("--- ESPERANDO A QUE SE DESPLIEGUE CORRECTAMENTE EL SISTEMA HADOOP DOCKERIZADO ---")
+    time.sleep(10)
     print("--- INICIANDO PIPELINE COMPLETO ---")
     
     for script in SCRIPTS:

@@ -87,13 +87,13 @@ En estas capturas se puede observar los docker stats durante el proceso de inges
 ![Captura Subida a HDFS (Ingesta) con Factor de Replicación = 1](../img/stats_ingestion_fr1.png)
 
 - Subida a HDFS (Ingesta) con Factor de Replicación = 2 :
-![Captura Subida a HDFS (Ingesta) con Factor de Replicación = 2]()
+![Captura Subida a HDFS (Ingesta) con Factor de Replicación = 2](../img/stats_ingestion_fr2.png)
 
 - Subida a HDFS (Ingesta) con Factor de Replicación = 3 :
-![Captura Subida a HDFS (Ingesta) con Factor de Replicación = 3]()
+![Captura Subida a HDFS (Ingesta) con Factor de Replicación = 3](../img/stats_ingestion_fr3.png)
 
 - Subida a HDFS (Ingesta) con Factor de Replicación = 4 :
-![Captura Subida a HDFS (Ingesta) con Factor de Replicación = 4]()
+![Captura Subida a HDFS (Ingesta) con Factor de Replicación = 4](../img/stats_ingestion_fr4.png)
 
 
 ## 5.1.2) Docker stats durante la replicación/copia en HDFS
@@ -103,15 +103,91 @@ En estas capturas se puede observar los docker stats durante el proceso de backu
 ![Captura Replicación/copia (Backup) en HDFS con Factor de Replicación = 1](../img/stats_backup_fr1.png)
 
 - Replicación/copia (Backup) en HDFS con Factor de Replicación = 2 :
-![Captura Replicación/copia (Backup) en HDFS con Factor de Replicación = 2]()
+![Captura Replicación/copia (Backup) en HDFS con Factor de Replicación = 2](../img/stats_backup_fr2.png)
 
 - Replicación/copia (Backup) en HDFS con Factor de Replicación = 3 :
-![Captura Replicación/copia (Backup) en HDFS con Factor de Replicación = 3]()
+![Captura Replicación/copia (Backup) en HDFS con Factor de Replicación = 3](../img/stats_backup_fr3.png)
 
 - Replicación/copia (Backup) en HDFS con Factor de Replicación = 4 :
-![Captura Replicación/copia (Backup) en HDFS con Factor de Replicación = 4]()
+![Captura Replicación/copia (Backup) en HDFS con Factor de Replicación = 4](../img/stats_backup_fr4.png)
 
 ## 5.2) Tabla de tiempos
-![Captura Tabla de tiempos]()
+![Captura Tabla de tiempos](../img/tabla_de_tiempos.png)
 
 ## 5.3) Impacto de replicación
+En estas capturas podemos observar el impacto de los diferentes factores de replicación en cuanto a almacenamiento. A través de la auditoría realizada con el comando dfsadmin -report, se evidencia una correlación lineal directa entre el nivel de integridad configurado y el consumo de recursos físicos en el clúster.
+
+- Impacto Factor de Replicación = 1
+
+![Configuración Factor de Replicación = 1 ](../img/configuracion_factor_replicacion_1.png)
+
+![Captura 1 Impacto Factor de Replicación = 1 ](../img/evidencia_replicacion_1_captura1.png)
+
+![Captura 2 Impacto Factor de Replicación = 1 ](../img/evidencia_replicacion_1_captura2.png)
+
+![Captura 3 Impacto Factor de Replicación = 1 ](../img/evidencia_replicacion_1_captura3.png)
+
+
+- Impacto Factor de Replicación = 2
+
+![Configuración Factor de Replicación = 2 ](../img/configuracion_factor_replicacion_2.png)
+
+![Captura 1 Impacto Factor de Replicación = 2 ](../img/evidencia_replicacion_2_captura1.png)
+
+![Captura 2 Impacto Factor de Replicación = 2 ](../img/evidencia_replicacion_2_captura2.png)
+
+![Captura 3 Impacto Factor de Replicación = 2 ](../img/evidencia_replicacion_2_captura3.png)
+
+- Impacto Factor de Replicación = 3
+
+![Configuración Factor de Replicación = 3 ](../img/configuracion_factor_replicacion_3.png)
+
+![Captura 1 Impacto Factor de Replicación = 3 ](../img/evidencia_replicacion_3_captura1.png)
+
+![Captura 2 Impacto Factor de Replicación = 3 ](../img/evidencia_replicacion_3_captura2.png)
+
+![Captura 3 Impacto Factor de Replicación = 3 ](../img/evidencia_replicacion_3_captura3.png)
+
+- Impacto Factor de Replicación = 4
+
+![Configuración Factor de Replicación = 4 ](../img/configuracion_factor_replicacion_4.png)
+
+![Captura 1 Impacto Factor de Replicación = 4 ](../img/evidencia_replicacion_4_captura1.png)
+
+![Captura 2 Impacto Factor de Replicación = 4 ](../img/evidencia_replicacion_4_captura2.png)
+
+![Captura 3 Impacto Factor de Replicación = 4 ](../img/evidencia_replicacion_4_captura3.png)
+
+A continuación, detallamos el comportamiento del almacenamiento (DFS Used) para un mismo volumen de datos lógicos (Ingesta + Backup, aprox. 500MB x 2 = 1GB lógico) bajo las distintas políticas:
+
+**Factor de Replicación 1 (Mínima):**
+
+- **Almacenamiento usado:** ~1.00 GB.
+
+- **Análisis:** El espacio físico ocupado corresponde estrictamente al tamaño de los datos. No existe redundancia. Los bloques se encuentran dispersos de forma asimétrica entre los nodos.
+
+- **Impacto:** Coste de infraestructura mínimo, pero riesgo crítico de pérdida de datos ante la caída de un solo nodo.
+
+**Factor de Replicación 2 (Media):**
+
+- **Almacenamiento usado:** ~2.01 GB.
+
+- **Análisis:** El consumo de disco se duplica. El sistema mantiene dos copias de cada bloque, distribuyéndolas en parejas de nodos.
+
+- **Impacto:** Permite tolerar el fallo de 1 DataNode sin detener el servicio.
+
+**Factor de Replicación 3 (Estándar):**
+
+- **Almacenamiento usado:** ~3.01 GB.
+
+- **Análisis:** El consumo se triplica respecto al dato original. Es la configuración por defecto de Hadoop.
+
+- **Impacto:** Ofrece el balance industrial estándar entre coste y seguridad, permitiendo la caída simultánea de hasta 2 nodos.
+
+**Factor de Replicación 4 (Máxima):**
+
+- **Almacenamiento usado:** ~4.01 GB.
+
+- **Análisis:** El consumo se cuadruplica. Al disponer de 4 DataNodes activos, este factor fuerza una simetría total: cada nodo posee una copia idéntica de toda la información (1GB por nodo).
+
+- **Impacto:** Disponibilidad y durabilidad máximas, con el mayor coste de almacenamiento posible.
