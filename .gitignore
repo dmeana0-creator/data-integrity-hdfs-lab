@@ -13,4 +13,4 @@ __pycache__/
 *raw_audits*/
 *resumen_audit*/
 
-!**/PARSEO_INFORME.ipynb
+!**/02_auditoria_integridad.ipynb
