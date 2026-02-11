@@ -264,7 +264,7 @@ python 90_run_all.py
 >python3 {nombre_script}.py
 >```
 
-> **¡IMPORTANTE!**: Cada vez que se ejecuta un script que realiza una auditoría (30, 60, 80 y 70) se reescribe la anterior.
+> **¡IMPORTANTE!**: Cada vez que se ejecuta un script que realiza una auditoría en un mismo directorio el mismo día (`30_fsck_data_audit.py`, `70_incident_simulation.py`, `80_recovery_restore.py`) se reescribe el informe de la anterior. 
 
 ### Ejecución notebook en Jupyter
 
@@ -302,4 +302,4 @@ cd data-integrity-hdfs-lab && python3 -m venv env && source env/bin/activate && 
 cd data-integrity-hdfs-lab ; python -m venv env ; .\env\Scripts\activate ; pip install uv ; uv pip install -r requirements.txt ; cd docker/clusterA ; docker compose down ; docker compose up -d --scale dnnm=4 ; cd ../../scripts ; python ./90_run_all.py
 ```
 
-> **¡IMPORTANTE!**: Cada vez que se ejecuta un script que realiza una auditoría en un mismo directorio el mismo día (`30_fsck_data_audit.py`, `70_incident_simulation.py`, `80_recovery_restore.py`) se reescribe la anterior. 
+> **¡IMPORTANTE!**: Cada vez que se ejecuta un script que realiza una auditoría en un mismo directorio el mismo día (`30_fsck_data_audit.py`, `70_incident_simulation.py`, `80_recovery_restore.py`) se reescribe el informe de la anterior. 
