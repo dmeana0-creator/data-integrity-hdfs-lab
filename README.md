@@ -44,11 +44,8 @@ El diseño del sistema se ha concebido para garantizar la Integridad del Dato (D
 ### 1. Arquitectura de Infraestructura (Microservicios)
 El clúster se despliega mediante Docker Compose, simulando un entorno Hadoop 3.x distribuido. La arquitectura separa claramente las funciones de gestión (Maestros) de las de trabajo (Workers).
 
-| Servicio / Contenedor | Rol (Función) | Descripción | Puertos (Accesos) |
-| :--- | :--- | :--- | :--- |
-| **`namenode`** | **Maestro de HDFS** | Gestiona el índice de archivos (metadatos) pero **no almacena datos** de usuario. Actúa como servidor principal para **Jupyter Notebook**, permitiendo persistir el trabajo en la carpeta `./notebooks`. | `9870` (HDFS WebUI)<br>`8889` (Jupyter Lab) |
-| **`resourcemanager`** | **Maestro de YARN** | Administra los recursos del clúster (CPU y RAM). Su función es decidir qué nodo está libre para ejecutar las tareas que enviamos. | `8088` (YARN WebUI) |
-| **`dnnm`** (x4) | **Nodos de Trabajo**<br>*(Storage + Compute)* | Son 4 contenedores escalados (`clustera-dnnm-1` a `4`) que realizan el trabajo pesado: **almacenan** los bloques de datos físicos y **ejecutan** el procesamiento. | *Internos* |
+![Imagen resumen arquitectura](./img/esquema_arquitectura.png)
+
 
 ### 2. Pipeline de Datos: Ciclo de Vida y Resiliencia
 Se ha implementado un flujo de trabajo que unifica la ingesta con protocolos estrictos de auditoría y recuperación. Cada fase es ejecutada por scripts especializados en Python.
