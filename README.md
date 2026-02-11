@@ -246,7 +246,7 @@ python 90_run_all.py
 >python3 90_run_all.py
 >```
 
-- **Opción B: Ejecución Manual Paso a Paso** Si deseamos depurar o ver el resultado de cada fase individualmente, ejecutamos los scripts en este orden desde la carpeta `scripts/` :
+- **Opción B: Ejecución Manual Paso a Paso** Si deseamos ver el resultado de cada fase individualmente, ejecutamos los scripts en este orden desde la carpeta `scripts/` :
 
 1. `python 00_bootstrap.py` (Prepara directorios HDFS).
 2. `python 10_generate_data.py` (Genera logs y datos IoT en local).
@@ -264,6 +264,28 @@ python 90_run_all.py
 >python3 {nombre_script}.py
 >```
 
+> **¡IMPORTANTE!**: Cada vez que se ejecuta un script que realiza una auditoría (30, 60, 80 y 70) se reescribe la anterior.
+
+### Ejecución notebook en Jupyter
+
+Como hemos indicado anteriormente, hay un servidor Jupyter Notebook alojado directamente en el contenedor del NameNode. Este entorno nos permite analizar de forma visual y estructurada las auditorías generadas por los scripts de Python.
+
+Para acceder y ejecutar el análisis, sigue estos pasos:
+
+1. **Requisitos previos:** Asegúrate de haber ejecutado el docker compose previamente y alguno de los scripts que generen auditorias: `30_fsck_data_audit.py`, `60_fsck_backup_audit.py`, `70_incident_simulation.py` o `80_recovery_restore.py` incluyendo los que les preceden de forma individual o en su defecto ejecutar el pipeline completo `90_run_all.py`.
+
+> **¡IMPORTANTE!**: Para ir generando los resúmenes de auditorías uno a uno se recomienda ejecutar el notebook cada vez que se genera un informe fsck. Siendo preferible así la opción de ejecutar los scripts secuencialmente de forma manual.
+
+2. **Acceso a la interfaz:** Abre tu navegador web e ingresa a http://localhost:8889. Si esto no funciona ve a Docker Desktop y clica sobre el nombre del contenedor `namenode` y busca en los logs algo así http://127.0.0.1:8889.
+
+3. **Localiza el Notebook:** La carpeta local `docker/clusterA/notebooks/` está mapeada dentro del contenedor. En la interfaz de Jupyter, navega hasta el archivo principal llamado `02_auditoria_integridad.ipynb` y ábrelo.
+
+4. **Ejecución del análisis:** Ejecuta las celdas de forma secuencial.
+
+El notebook leerá los reportes de auditorías generadas en la carpeta `raw_audits` generada los scripts de auditoría, procesará los datos y te mostrará un resumen claro sobre el estado de salud del directorio auditado (`/data` o `/backup`) y lo guardará en el sistema de archivos HDFS en `/audits` y en local en la carpeta `/resumen_audits`que se creará en la misma carpeta del notebook al ejecutar sus celdas.
+
+Además, en el notebook podemos visualizar el análisis de diferentes métricas, en relación al uso de diferentes factores de replicación, y unas conclusiones y recomendaciones de dicho análisis.
+
 ---
 
 ## Quickstart (para corrección)
@@ -279,3 +301,5 @@ cd data-integrity-hdfs-lab && python3 -m venv env && source env/bin/activate && 
 ```bash
 cd data-integrity-hdfs-lab ; python -m venv env ; .\env\Scripts\activate ; pip install uv ; uv pip install -r requirements.txt ; cd docker/clusterA ; docker compose down ; docker compose up -d --scale dnnm=4 ; cd ../../scripts ; python ./90_run_all.py
 ```
+
+> **¡IMPORTANTE!**: Cada vez que se ejecuta un script que realiza una auditoría en un mismo directorio el mismo día (`30_fsck_data_audit.py`, `70_incident_simulation.py`, `80_recovery_restore.py`) se reescribe la anterior. 
