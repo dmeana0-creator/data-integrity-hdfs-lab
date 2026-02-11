@@ -1,5 +1,5 @@
 # DataSecure Lab — Integridad de Datos en Big Data (HDFS)
-**Versión**: `v1.0-entrega` **Contexto** Proyecto de ingenieria de datos para la empresa ficticia Datasecure.
+**Versión**: `v1.0-entrega` **Contexto**: Proyecto de ingenieria de datos para la empresa ficticia Datasecure.
 
 Este repositorio contiene la implementación de un pipeline de ingesta y preservación digital para la gestión, auditoría, simulación de incidentes y recuperación de datos sensibles (Logs y Telemetría IoT) en un ecosistema Hadoop dockerizado.
 
