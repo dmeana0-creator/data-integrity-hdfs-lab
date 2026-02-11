@@ -3,7 +3,7 @@
 
 Este repositorio contiene la implementación de un pipeline de ingesta y preservación digital para la gestión, auditoría, simulación de incidentes y recuperación de datos sensibles (Logs y Telemetría IoT) en un ecosistema Hadoop dockerizado.
 
-El objetivo principal es garantizar la integridad de los datos y validar la resiliencia de la infraestructura frente a fallos críticos, demostrando capacidades de Auto-recuperación).
+El objetivo principal es garantizar la integridad de los datos y validar la resiliencia de la infraestructura frente a fallos críticos, demostrando capacidades de Auto-recuperación.
 
 ---
 ## Estructura del repositorio

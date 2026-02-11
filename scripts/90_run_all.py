@@ -1,3 +1,4 @@
+# Importamos las librerías necesarias
 import subprocess
 import time
 import sys
